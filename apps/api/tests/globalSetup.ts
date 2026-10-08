@@ -11,7 +11,7 @@ export function testDatabaseUrl(): string {
     process.env.DATABASE_URL ??
     "postgresql://commerce:commerce_dev_only@localhost:55440/commerce?schema=public";
   const u = new URL(base);
-  u.pathname = "/commerce_test";
+  u.pathname = `/${process.env.TEST_DB_NAME ?? "commerce_test"}`;
   return u.toString();
 }
 
@@ -22,7 +22,8 @@ export default async function setup() {
   admin.pathname = "/postgres";
   const client = new PrismaClient({ datasourceUrl: admin.toString() });
   try {
-    await client.$executeRawUnsafe("CREATE DATABASE commerce_test");
+    const name = (process.env.TEST_DB_NAME ?? "commerce_test").replace(/[^a-z0-9_]/gi, "");
+    await client.$executeRawUnsafe(`CREATE DATABASE "${name}"`);
   } catch {
     /* already exists */
   } finally {
