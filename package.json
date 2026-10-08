@@ -1,0 +1,35 @@
+{
+  "name": "kash-commerce",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Reusable single-store ecommerce backend + admin core. One deployment per client.",
+  "workspaces": ["apps/*", "packages/*", "examples/*"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev:db": "docker compose up -d postgres",
+    "dev:api": "npm run dev -w @kash-commerce/api",
+    "dev:admin": "npm run dev -w @kash-commerce/admin",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run generate -w @kash-commerce/database",
+    "db:migrate": "npm run migrate:deploy -w @kash-commerce/database",
+    "db:migrate:dev": "npm run migrate:dev -w @kash-commerce/database",
+    "db:validate": "npm run validate -w @kash-commerce/database",
+    "create-store": "tsx scripts/create-store/index.ts",
+    "create-admin": "tsx scripts/seed/create-admin.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0",
+    "vitest": "^2.1.8"
+  }
+}

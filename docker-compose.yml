@@ -1,0 +1,19 @@
+# Development stack: Postgres only by default. Run API/Admin with npm for hot reload.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: commerce
+      POSTGRES_PASSWORD: commerce_dev_only
+      POSTGRES_DB: commerce
+    ports:
+      - "55440:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commerce -d commerce"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  pgdata:
