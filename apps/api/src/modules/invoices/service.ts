@@ -176,7 +176,7 @@ function money(snap: InvoiceSnapshot) {
       currencyDisplay: "code",
     });
   }
-  return (v: string) => fmt.format(Number(v)).replace(/[  ]/g, " ");
+  return (v: string) => fmt.format(Number(v)).replace(/\s/g, " ");
 }
 
 function addressLines(a: InvoiceAddress | Record<string, unknown> | null | undefined): string[] {

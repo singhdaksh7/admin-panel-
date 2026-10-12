@@ -144,17 +144,17 @@ export async function createRefund(
       const pay = await tx.payment.findUniqueOrThrow({ where: { id: input.paymentId } });
       if (pay.status !== "PAID" && pay.status !== "PARTIALLY_REFUNDED")
         throw AppError.conflict(`A ${pay.status} payment cannot be refunded`);
-      const refundable = toMinor(pay.amount.toFixed(2)) - toMinor(pay.refundedAmount.toFixed(2));
-      if (amountMinor > refundable)
-        throw AppError.validation("Refund exceeds the refundable balance", {
-          refundable: fromMinor(Math.max(0, refundable)),
-        });
       if (input.returnId) {
         const dup = await tx.refund.count({
           where: { returnId: input.returnId, status: { in: ["PENDING", "PROCESSED"] } },
         });
         if (dup) throw AppError.conflict("This return already has a refund");
       }
+      const refundable = toMinor(pay.amount.toFixed(2)) - toMinor(pay.refundedAmount.toFixed(2));
+      if (amountMinor > refundable)
+        throw AppError.validation("Refund exceeds the refundable balance", {
+          refundable: fromMinor(Math.max(0, refundable)),
+        });
       const created = await tx.refund.create({
         data: {
           paymentId: pay.id,

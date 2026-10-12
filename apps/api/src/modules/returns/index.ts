@@ -464,6 +464,12 @@ export function register(ctx: AppContext): ModuleRoutes {
       const ret = await loadFullOrThrow(id);
       if (ret.status !== "RECEIVED")
         throw AppError.conflict(`Return is ${ret.status}; only RECEIVED returns can be refunded`);
+      if (
+        await p.refund.count({
+          where: { returnId: id, status: { in: ["PENDING", "PROCESSED"] } },
+        })
+      )
+        throw AppError.conflict("This return already has a refund");
       const payment = await p.payment.findFirst({
         where: { orderId: ret.orderId, status: { in: ["PAID", "PARTIALLY_REFUNDED"] } },
         orderBy: { createdAt: "desc" },

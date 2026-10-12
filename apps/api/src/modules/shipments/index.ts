@@ -300,7 +300,21 @@ export function register(ctx: AppContext): ModuleRoutes {
           error: null,
         },
       });
-      const order = await transitionOrder(ctx, found.id, "SHIPPED", actor, "Shipment created");
+      let order;
+      try {
+        order = await transitionOrder(ctx, found.id, "SHIPPED", actor, "Shipment created");
+      } catch (err) {
+        // the order changed under us: do not leave an orphan shipment at the carrier
+        await impl.cancelShipment(result.providerShipmentId).catch(() => undefined);
+        await p.shipment.update({
+          where: { id: shipment.id },
+          data: {
+            status: "CANCELLED",
+            error: "Order changed while the shipment was being created",
+          },
+        });
+        throw err;
+      }
       await p.orderEvent.create({
         data: {
           orderId: found.id,

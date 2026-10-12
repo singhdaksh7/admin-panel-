@@ -92,7 +92,10 @@ describe("POST /payments/verify", () => {
     const r = await cust.agent
       .post("/api/v1/checkout/create")
       .set("x-csrf-token", cust.csrf)
-      .send({ cartToken: token, shippingAddress: { fullName: "O", line1: "x", city: "c", postalCode: "1", country: "IN" } });
+      .send({
+        cartToken: token,
+        shippingAddress: { fullName: "O", line1: "x", city: "c", postalCode: "1", country: "IN" },
+      });
     expect(r.status).toBe(201);
     const order = await prisma.order.findUniqueOrThrow({
       where: { orderNumber: r.body.order.orderNumber },
@@ -180,9 +183,9 @@ describe("webhooks", () => {
     const o = await prisma.order.findUniqueOrThrow({ where: { id: placed.order.id } });
     expect(o.status).toBe("CONFIRMED");
     expect(o.paymentStatus).toBe("PAID");
-    expect(
-      await prisma.orderEvent.count({ where: { orderId: o.id, type: "PAYMENT_PAID" } }),
-    ).toBe(1);
+    expect(await prisma.orderEvent.count({ where: { orderId: o.id, type: "PAYMENT_PAID" } })).toBe(
+      1,
+    );
     expect(await prisma.webhookEvent.count({ where: { eventId: "evt_parallel_1" } })).toBe(1);
     const ev = await prisma.webhookEvent.findFirstOrThrow({ where: { eventId: "evt_parallel_1" } });
     expect(ev.processedAt).not.toBeNull();
@@ -273,7 +276,10 @@ describe("admin payments", () => {
     expect(r.status).toBe(200);
     expect(r.body.payment.status).toBe("PAID");
     expect(r.body.order.paymentStatus).toBe("PAID");
-    const again = await admin.post(`/api/v1/admin/orders/${placed.order.id}/payments/mark-paid`, {});
+    const again = await admin.post(
+      `/api/v1/admin/orders/${placed.order.id}/payments/mark-paid`,
+      {},
+    );
     expect(again.status).toBe(200);
     expect(
       await prisma.orderEvent.count({
@@ -400,8 +406,12 @@ describe("refunds", () => {
     expect(done.body.status).toBe("PROCESSED");
     pay = await prisma.payment.findUniqueOrThrow({ where: { id: placed.payment.id } });
     expect(pay.status).toBe("REFUNDED");
-    expect((await admin.patch(`/api/v1/admin/refunds/${r.body.refund.id}`, { status: "FAILED" })).status).toBe(409);
-    expect((await admin.get("/api/v1/admin/refunds?status=PROCESSED")).body.total).toBeGreaterThan(0);
+    expect(
+      (await admin.patch(`/api/v1/admin/refunds/${r.body.refund.id}`, { status: "FAILED" })).status,
+    ).toBe(409);
+    expect((await admin.get("/api/v1/admin/refunds?status=PROCESSED")).body.total).toBeGreaterThan(
+      0,
+    );
   });
 
   it("failing a pending manual refund releases its reservation", async () => {
@@ -427,7 +437,10 @@ describe("refunds", () => {
     const mockPlaced = await paid({ qty: 2 });
     const spy = mock();
     const real = spy.refundPayment;
-    spy.refundPayment = async (i) => ({ providerRefundId: `r_${i.idempotencyKey}`, status: "PENDING" });
+    spy.refundPayment = async (i) => ({
+      providerRefundId: `r_${i.idempotencyKey}`,
+      status: "PENDING",
+    });
     const r = await refund(mockPlaced.payment.id, { amount: "20.00" });
     spy.refundPayment = real;
     expect(r.body.refund.status).toBe("PENDING");
