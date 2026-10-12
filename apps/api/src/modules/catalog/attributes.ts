@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { AppError } from "@kash-commerce/shared";
+import { AppError, slugify } from "@kash-commerce/shared";
 import { Prisma } from "@kash-commerce/database";
 import type { AppContext } from "../../context";
 import { h, idParam, parse } from "../../lib/http";
@@ -172,16 +172,7 @@ export function registerAttributes(ctx: AppContext, admin: Router) {
       const body = parse(valueBody, req.body);
       if (!(await p.attribute.findUnique({ where: { id }, select: { id: true } })))
         throw AppError.notFound("Attribute");
-      const slug =
-        body.slug ??
-        (await uniqueSlug(
-          async (s) =>
-            !!(await p.attributeValue.findUnique({
-              where: { attributeId_slug: { attributeId: id, slug: s } },
-              select: { id: true },
-            })),
-          body.value,
-        ));
+      const slug = body.slug ?? slugify(body.value);
       try {
         const v = await p.attributeValue.create({
           data: {
