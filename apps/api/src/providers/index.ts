@@ -7,6 +7,7 @@ import type {
 import type { Env } from "@kash-commerce/config";
 import type { PrismaClient } from "@kash-commerce/database";
 import type { Logger } from "pino";
+import { AppError } from "@kash-commerce/shared";
 
 /**
  * Provider registry. Each kind maps provider-key -> implementation.
@@ -49,3 +50,25 @@ export interface ProviderDeps {
 
 // Implementations are registered by ./build.ts (kept separate to avoid circular imports).
 export { buildProviders } from "./build";
+
+export function getActivePayment(ctx: { providers: Providers }): PaymentProvider {
+  const p = ctx.providers.payment[ctx.providers.activePayment];
+  if (!p)
+    throw new AppError(
+      500,
+      "INTERNAL_ERROR",
+      `Active payment provider "${ctx.providers.activePayment}" is not registered`,
+    );
+  return p;
+}
+
+export function getActiveShipping(ctx: { providers: Providers }): ShippingProvider {
+  const p = ctx.providers.shipping[ctx.providers.activeShipping];
+  if (!p)
+    throw new AppError(
+      500,
+      "INTERNAL_ERROR",
+      `Active shipping provider "${ctx.providers.activeShipping}" is not registered`,
+    );
+  return p;
+}
