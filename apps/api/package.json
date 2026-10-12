@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsup src/server.ts --format esm --target node20 --clean --noExternal @kash-commerce/shared --noExternal @kash-commerce/config --noExternal @kash-commerce/contracts --noExternal @kash-commerce/provider-sdk --noExternal @kash-commerce/database",
+    "build": "tsup",
     "start": "node dist/server.js",
     "typecheck": "tsc -p . --noEmit",
     "test": "vitest run"

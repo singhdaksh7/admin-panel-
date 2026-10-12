@@ -4,7 +4,7 @@
  */
 import readline from "node:readline/promises";
 import { createPrisma } from "@kash-commerce/database";
-import { createSuperAdmin } from "../../apps/api/src/bootstrap";
+import { createSuperAdmin } from "../bootstrap";
 
 async function prompt(q: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
