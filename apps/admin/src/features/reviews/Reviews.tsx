@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Paginated } from "../../lib/api";
 import { useAuth } from "../../auth/AuthContext";
@@ -59,7 +59,6 @@ export function Reviews() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
-  const [note, setNote] = useState("");
   const [toDelete, setToDelete] = useState<Review | { bulk: true } | null>(null);
   const q = useDebounced(search);
 
@@ -72,7 +71,7 @@ export function Reviews() {
     void qc.invalidateQueries({ queryKey: ["reviews"] });
   };
 
-  async function moderate() {
+  async function moderate(note: string) {
     if (!pending) return;
     try {
       if (pending.kind === "single") {
@@ -90,12 +89,13 @@ export function Reviews() {
         toast.success(`${r.affected} review(s) updated`);
       }
       setPending(null);
-      setNote("");
       refresh();
     } catch (e) {
       toast.error(e);
     }
   }
+
+  const cancelPending = useCallback(() => setPending(null), []);
 
   const del = useMutation({
     mutationFn: async (t: Review | { bulk: true }) => {
@@ -276,7 +276,7 @@ export function Reviews() {
         </>
       )}
       {pending && (
-        <Modal
+        <ModerateDialog
           title={
             pending.kind === "single"
               ? pending.status === "APPROVED"
@@ -286,24 +286,9 @@ export function Reviews() {
                 ? `Approve ${selected.length} reviews`
                 : `Reject ${selected.length} reviews`
           }
-          onClose={() => setPending(null)}
-          footer={
-            <>
-              <Button onClick={() => setPending(null)}>Cancel</Button>
-              <Button variant="primary" onClick={() => void moderate()}>
-                Confirm
-              </Button>
-            </>
-          }
-        >
-          <TextArea
-            label="Moderation note (optional)"
-            value={note}
-            maxLength={500}
-            onChange={(e) => setNote(e.target.value)}
-            hint="Internal only - not shown to customers"
-          />
-        </Modal>
+          onCancel={cancelPending}
+          onConfirm={moderate}
+        />
       )}
       {toDelete && (
         <ConfirmDialog
@@ -320,5 +305,52 @@ export function Reviews() {
         />
       )}
     </>
+  );
+}
+
+/** Owns the note state so typing never re-renders the page (Modal re-focuses on parent renders). */
+function ModerateDialog({
+  title,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  onCancel: () => void;
+  onConfirm: (note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal
+      title={title}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button
+            variant="primary"
+            loading={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onConfirm(note);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Confirm
+          </Button>
+        </>
+      }
+    >
+      <TextArea
+        label="Moderation note (optional)"
+        value={note}
+        maxLength={500}
+        onChange={(e) => setNote(e.target.value)}
+        hint="Internal only - not shown to customers"
+      />
+    </Modal>
   );
 }

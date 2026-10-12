@@ -1,5 +1,5 @@
 import type { RouteObject } from "react-router-dom";
-import { Guard } from "../../routes";
+import { Guard } from "./guard";
 import { MediaLibrary } from "./MediaLibrary";
 
 export const routes: RouteObject[] = [
