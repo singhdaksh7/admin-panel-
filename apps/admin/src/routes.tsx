@@ -28,6 +28,14 @@ export function NotFound() {
  * `routes: RouteObject[]` (paths relative to "/", wrapped in <Guard perm=...>). Add ONE line below per feature.
  */
 import { routes as accountRoutes } from "./features/account/routes";
+import { routes as productsRoutes } from "./features/products/routes";
+import { routes as categoriesRoutes } from "./features/categories/routes";
+import { routes as collectionsRoutes } from "./features/collections/routes";
+import { routes as attributesRoutes } from "./features/attributes/routes";
+import { routes as inventoryRoutes } from "./features/inventory/routes";
+import { routes as ordersRoutes } from "./features/orders/routes";
+import { routes as returnsRoutes } from "./features/returns/routes";
+import { routes as customersRoutes } from "./features/customers/routes";
 
 export const appRoutes: RouteObject[] = [
   {
@@ -39,6 +47,14 @@ export const appRoutes: RouteObject[] = [
     ),
   },
   ...accountRoutes,
+  ...productsRoutes,
+  ...categoriesRoutes,
+  ...collectionsRoutes,
+  ...attributesRoutes,
+  ...inventoryRoutes,
+  ...ordersRoutes,
+  ...returnsRoutes,
+  ...customersRoutes,
   { path: "*", element: <NotFound /> },
 ];
 
