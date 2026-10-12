@@ -57,6 +57,18 @@ const cleanAddr = (a: Addr) => ({
   country: a.country,
 });
 
+/** Customer cart first; a signed-in shopper may also check out an explicit anonymous cart token. */
+async function cartFor(
+  db: Parameters<typeof findCartBy>[0],
+  customerId: string | undefined,
+  token: string | undefined,
+) {
+  return (
+    (customerId ? await findCartBy(db, { customerId }) : null) ??
+    (token ? await findCartBy(db, { token }) : null)
+  );
+}
+
 export function register(ctx: AppContext): ModuleRoutes {
   const limiters = createLimiters(ctx.env.NODE_ENV !== "test");
   const p = ctx.prisma;
@@ -80,10 +92,7 @@ export function register(ctx: AppContext): ModuleRoutes {
     opt,
     h(async (req, res) => {
       const b = parse(summaryBody, req.body);
-      const cart = await findCartBy(p, {
-        customerId: req.customer?.id,
-        token: b.cartToken ?? cartTokenFrom(req),
-      });
+      const cart = await cartFor(p, req.customer?.id, b.cartToken ?? cartTokenFrom(req));
       if (!cart || cart.items.length === 0) throw AppError.badRequest("Cart is empty");
       const ship = cleanAddr(b.shippingAddress);
       const t = await computeTotals(ctx, p, {
@@ -171,7 +180,7 @@ export function register(ctx: AppContext): ModuleRoutes {
 
         const created = await p.$transaction(
           async (tx) => {
-            const cart = await findCartBy(tx, { customerId: req.customer?.id, token });
+            const cart = await cartFor(tx, req.customer?.id, token);
             if (!cart || cart.items.length === 0) throw AppError.badRequest("Cart is empty");
             const t = await computeTotals(ctx, tx, {
               items: cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
@@ -317,7 +326,7 @@ export function register(ctx: AppContext): ModuleRoutes {
               const r = await impl.createPayment({
                 orderId: order.id,
                 orderNumber: order.orderNumber,
-                amount: order.total.toString(),
+                amount: order.total.toFixed(2),
                 currency: order.currency,
                 customer: { email, name: ship.fullName, phone: phone ?? undefined },
               });

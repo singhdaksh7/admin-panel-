@@ -122,7 +122,7 @@ export function register(ctx: AppContext): ModuleRoutes {
             paymentStatus: o.paymentStatus,
             email: o.email,
             customer: (o.customerSnapshot as { name?: string } | null)?.name ?? null,
-            total: o.total.toString(),
+            total: o.total.toFixed(2),
             currency: o.currency,
             itemCount: o._count.items,
             createdAt: o.createdAt,
@@ -154,23 +154,23 @@ export function register(ctx: AppContext): ModuleRoutes {
       if (!o) throw AppError.notFound("Order");
       res.json({
         ...o,
-        subtotal: o.subtotal.toString(),
-        discountTotal: o.discountTotal.toString(),
-        shippingTotal: o.shippingTotal.toString(),
-        taxTotal: o.taxTotal.toString(),
-        total: o.total.toString(),
+        subtotal: o.subtotal.toFixed(2),
+        discountTotal: o.discountTotal.toFixed(2),
+        shippingTotal: o.shippingTotal.toFixed(2),
+        taxTotal: o.taxTotal.toFixed(2),
+        total: o.total.toFixed(2),
         items: o.items.map((i) => ({
           ...i,
-          unitPrice: i.unitPrice.toString(),
-          discount: i.discount.toString(),
+          unitPrice: i.unitPrice.toFixed(2),
+          discount: i.discount.toFixed(2),
           taxRate: i.taxRate.toString(),
-          taxAmount: i.taxAmount.toString(),
-          lineTotal: i.lineTotal.toString(),
+          taxAmount: i.taxAmount.toFixed(2),
+          lineTotal: i.lineTotal.toFixed(2),
         })),
         payments: o.payments.map((x) => ({
           ...x,
-          amount: x.amount.toString(),
-          refundedAmount: x.refundedAmount.toString(),
+          amount: x.amount.toFixed(2),
+          refundedAmount: x.refundedAmount.toFixed(2),
         })),
         invoice: o.invoice ?? { status: "NOT_GENERATED" },
       });
@@ -333,7 +333,7 @@ export function register(ctx: AppContext): ModuleRoutes {
           p.storeSettings.findUnique({ where: { id: "store" } }),
         ]);
       const sum = (a: { _sum: { total: Prisma.Decimal | null }; _count: number }) => ({
-        revenue: (a._sum.total ?? 0).toString(),
+        revenue: (a._sum.total ?? 0).toFixed(2),
         orders: a._count,
       });
       const outOfStock = lowStock.filter((l) => l.onHand - l.reserved <= 0).length;
@@ -350,7 +350,7 @@ export function register(ctx: AppContext): ModuleRoutes {
           quantity: Number(t.quantity),
           revenue: t.revenue,
         })),
-        recentOrders: recent.map((o) => ({ ...o, total: o.total.toString() })),
+        recentOrders: recent.map((o) => ({ ...o, total: o.total.toFixed(2) })),
         alerts: {
           pendingUnpaidOrders: pendingUnpaid,
           lowStockVariants: lowStock.length,

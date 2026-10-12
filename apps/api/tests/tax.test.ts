@@ -79,13 +79,17 @@ describe("computeTax", () => {
   });
 
   it("applies tax AFTER discount", () => {
-    const r = computeTax({ mode: "EXCLUSIVE", defaultRate: 10 }, [line(1000, 1, { discountMinor: 200 })]);
+    const r = computeTax({ mode: "EXCLUSIVE", defaultRate: 10 }, [
+      line(1000, 1, { discountMinor: 200 }),
+    ]);
     expect(r.lines[0]!.taxMinor).toBe(80);
     expect(r.lines[0]!.totalMinor).toBe(880);
   });
 
   it("never lets a discount exceed the line", () => {
-    const r = computeTax({ mode: "EXCLUSIVE", defaultRate: 10 }, [line(1000, 1, { discountMinor: 5000 })]);
+    const r = computeTax({ mode: "EXCLUSIVE", defaultRate: 10 }, [
+      line(1000, 1, { discountMinor: 5000 }),
+    ]);
     expect(r.lines[0]!.totalMinor).toBe(0);
     expect(r.taxMinor).toBe(0);
   });
@@ -126,7 +130,9 @@ describe("computeTax", () => {
   });
 
   it("sum of line taxes equals the total with many fractional lines", () => {
-    const lines = Array.from({ length: 25 }, (_, i) => line(99 + i * 7, 1 + (i % 3), { taxRate: 18 }));
+    const lines = Array.from({ length: 25 }, (_, i) =>
+      line(99 + i * 7, 1 + (i % 3), { taxRate: 18 }),
+    );
     const r = computeTax({ mode: "EXCLUSIVE" }, lines);
     expect(r.taxMinor).toBe(r.lines.reduce((a, l) => a + l.taxMinor, 0));
     expect(r.breakdown.reduce((a, b) => a + b.amountMinor, 0)).toBe(r.taxMinor);

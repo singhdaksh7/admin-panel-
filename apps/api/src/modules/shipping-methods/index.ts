@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import type { ShippingMethod } from "@kash-commerce/database";
 import { AppError, toMinor } from "@kash-commerce/shared";
 import type { AppContext } from "../../context";
 import type { ModuleRoutes } from "../types";
@@ -49,6 +50,12 @@ function check(b: {
     throw AppError.validation("maxDays must be >= minDays");
 }
 
+const adminDto = (m: ShippingMethod) => ({
+  ...m,
+  price: m.price.toFixed(2),
+  freeOverAmount: m.freeOverAmount?.toFixed(2) ?? null,
+});
+
 export function register(ctx: AppContext): ModuleRoutes {
   const limiters = createLimiters(ctx.env.NODE_ENV !== "test");
   const p = ctx.prisma;
@@ -74,9 +81,9 @@ export function register(ctx: AppContext): ModuleRoutes {
     requirePermission("settings.read"),
     h(async (_req, res) => {
       res.json({
-        items: await p.shippingMethod.findMany({
-          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        }),
+        items: (
+          await p.shippingMethod.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] })
+        ).map(adminDto),
       });
     }),
   );
@@ -95,7 +102,7 @@ export function register(ctx: AppContext): ModuleRoutes {
         entityId: created.id,
         after: b,
       });
-      res.status(201).json(created);
+      res.status(201).json(adminDto(created));
     }),
   );
   admin.patch(
@@ -127,7 +134,7 @@ export function register(ctx: AppContext): ModuleRoutes {
         before,
         after: b,
       });
-      res.json(updated);
+      res.json(adminDto(updated));
     }),
   );
   admin.delete(

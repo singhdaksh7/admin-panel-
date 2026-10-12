@@ -30,16 +30,24 @@ describe("customer auth", () => {
   });
 
   it("rejects weak passwords and duplicate emails", async () => {
-    const weak = await request(app).post("/api/v1/account/register").send({ email: "w@example.com", password: "short" });
+    const weak = await request(app)
+      .post("/api/v1/account/register")
+      .send({ email: "w@example.com", password: "short" });
     expect(weak.status).toBe(422);
-    const dup = await request(app).post("/api/v1/account/register").send({ email: "new@example.com", password: PW });
+    const dup = await request(app)
+      .post("/api/v1/account/register")
+      .send({ email: "new@example.com", password: PW });
     expect(dup.status).toBe(409);
   });
 
   it("login is generic on failure, works on success, and /me needs the session", async () => {
     expect((await request(app).get("/api/v1/account/me")).status).toBe(401);
-    const bad = await request(app).post("/api/v1/account/login").send({ email: "new@example.com", password: "wrong-password-1" });
-    const unknown = await request(app).post("/api/v1/account/login").send({ email: "nobody@example.com", password: "wrong-password-1" });
+    const bad = await request(app)
+      .post("/api/v1/account/login")
+      .send({ email: "new@example.com", password: "wrong-password-1" });
+    const unknown = await request(app)
+      .post("/api/v1/account/login")
+      .send({ email: "nobody@example.com", password: "wrong-password-1" });
     expect(bad.status).toBe(401);
     expect(unknown.body.error.message).toBe(bad.body.error.message);
     const c = await loginCustomer(app, "new@example.com");
@@ -53,14 +61,21 @@ describe("customer auth", () => {
     const noCsrf = await c.agent.patch("/api/v1/account/me").send({ lastName: "X" });
     expect(noCsrf.status).toBe(403);
     expect(noCsrf.body.error.code).toBe("CSRF_FAILED");
-    const wrong = await c.agent.patch("/api/v1/account/me").set("x-csrf-token", "nope").send({ lastName: "X" });
+    const wrong = await c.agent
+      .patch("/api/v1/account/me")
+      .set("x-csrf-token", "nope")
+      .send({ lastName: "X" });
     expect(wrong.status).toBe(403);
-    expect((await c.patch("/api/v1/account/me", { lastName: "Sharma" })).body.customer.lastName).toBe("Sharma");
+    expect(
+      (await c.patch("/api/v1/account/me", { lastName: "Sharma" })).body.customer.lastName,
+    ).toBe("Sharma");
   });
 
   it("rotates refresh tokens and revokes the family when a rotated token is replayed", async () => {
     const agent = request.agent(app);
-    const login = await agent.post("/api/v1/account/login").send({ email: "new@example.com", password: PW });
+    const login = await agent
+      .post("/api/v1/account/login")
+      .send({ email: "new@example.com", password: PW });
     const oldCookie = login.headers["set-cookie"]![0]!.split(";")[0]!;
     const refreshed = await agent.post("/api/v1/account/refresh");
     expect(refreshed.status).toBe(200);
@@ -81,8 +96,12 @@ describe("customer auth", () => {
   it("backs off after repeated failed logins", async () => {
     await registerCustomer(app, "lock@example.com");
     for (let i = 0; i < 5; i++)
-      await request(app).post("/api/v1/account/login").send({ email: "lock@example.com", password: "bad-password-xx" });
-    const locked = await request(app).post("/api/v1/account/login").send({ email: "lock@example.com", password: PW });
+      await request(app)
+        .post("/api/v1/account/login")
+        .send({ email: "lock@example.com", password: "bad-password-xx" });
+    const locked = await request(app)
+      .post("/api/v1/account/login")
+      .send({ email: "lock@example.com", password: PW });
     expect(locked.status).toBe(429);
     expect(locked.body.error.code).toBe("ACCOUNT_LOCKED");
   });
@@ -90,9 +109,19 @@ describe("customer auth", () => {
   it("changes password and revokes other sessions", async () => {
     const a = await registerCustomer(app, "pw@example.com");
     const b = await loginCustomer(app, "pw@example.com");
-    const bad = await a.post("/api/v1/account/change-password", { currentPassword: "nope-nope-nope", newPassword: "Another-Pass-9" });
+    const bad = await a.post("/api/v1/account/change-password", {
+      currentPassword: "nope-nope-nope",
+      newPassword: "Another-Pass-9",
+    });
     expect(bad.status).toBe(422);
-    expect((await a.post("/api/v1/account/change-password", { currentPassword: PW, newPassword: "Another-Pass-9" })).status).toBe(200);
+    expect(
+      (
+        await a.post("/api/v1/account/change-password", {
+          currentPassword: PW,
+          newPassword: "Another-Pass-9",
+        })
+      ).status,
+    ).toBe(200);
     expect((await a.get("/api/v1/account/me")).status).toBe(200);
     expect((await b.get("/api/v1/account/me")).status).toBe(401);
     expect((await loginCustomer(app, "pw@example.com", "Another-Pass-9")).id).toBe(a.id);
@@ -102,12 +131,22 @@ describe("customer auth", () => {
 describe("password reset", () => {
   it("is non-enumerating, single-use, and revokes sessions", async () => {
     const c = await registerCustomer(app, "reset@example.com");
-    const known = await request(app).post("/api/v1/account/forgot-password").send({ email: "reset@example.com" });
-    const unknown = await request(app).post("/api/v1/account/forgot-password").send({ email: "ghost@example.com" });
+    const known = await request(app)
+      .post("/api/v1/account/forgot-password")
+      .send({ email: "reset@example.com" });
+    const unknown = await request(app)
+      .post("/api/v1/account/forgot-password")
+      .send({ email: "ghost@example.com" });
     expect(known.status).toBe(200);
     expect(unknown.body).toEqual(known.body);
-    expect(await prisma.notificationLog.count({ where: { event: "password.reset", recipient: "reset@example.com" } })).toBe(1);
-    expect(await prisma.notificationLog.count({ where: { recipient: "ghost@example.com" } })).toBe(0);
+    expect(
+      await prisma.notificationLog.count({
+        where: { event: "password.reset", recipient: "reset@example.com" },
+      }),
+    ).toBe(1);
+    expect(await prisma.notificationLog.count({ where: { recipient: "ghost@example.com" } })).toBe(
+      0,
+    );
 
     // the raw token only exists in the email: plant a known one
     const { sha256 } = await import("../src/lib/crypto");
@@ -115,9 +154,17 @@ describe("password reset", () => {
     await prisma.customerPasswordReset.create({
       data: { customerId: c.id, tokenHash: sha256(raw), expiresAt: new Date(Date.now() + 60_000) },
     });
-    const ok = await request(app).post("/api/v1/account/reset-password").send({ token: raw, newPassword: "Brand-New-Pass-1" });
+    const ok = await request(app)
+      .post("/api/v1/account/reset-password")
+      .send({ token: raw, newPassword: "Brand-New-Pass-1" });
     expect(ok.status).toBe(200);
-    expect((await request(app).post("/api/v1/account/reset-password").send({ token: raw, newPassword: "Brand-New-Pass-2" })).status).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post("/api/v1/account/reset-password")
+          .send({ token: raw, newPassword: "Brand-New-Pass-2" })
+      ).status,
+    ).toBe(400);
     expect((await c.get("/api/v1/account/me")).status).toBe(401);
     expect((await loginCustomer(app, "reset@example.com", "Brand-New-Pass-1")).id).toBe(c.id);
   });
@@ -130,18 +177,29 @@ describe("addresses + IDOR", () => {
     const first = await a.post("/api/v1/account/addresses", addr());
     expect(first.status).toBe(201);
     expect(first.body.isDefaultShipping).toBe(true);
-    const second = await a.post("/api/v1/account/addresses", addr({ line1: "2 Park St", isDefaultShipping: true }));
+    const second = await a.post(
+      "/api/v1/account/addresses",
+      addr({ line1: "2 Park St", isDefaultShipping: true }),
+    );
     expect(second.body.isDefaultShipping).toBe(true);
     const list = await a.get("/api/v1/account/addresses");
-    expect(list.body.items.filter((x: { isDefaultShipping: boolean }) => x.isDefaultShipping)).toHaveLength(1);
+    expect(
+      list.body.items.filter((x: { isDefaultShipping: boolean }) => x.isDefaultShipping),
+    ).toHaveLength(1);
 
     // b cannot see/modify/delete a's address
     expect((await b.get("/api/v1/account/addresses")).body.items).toHaveLength(0);
-    expect((await b.patch(`/api/v1/account/addresses/${first.body.id}`, { city: "Hacked" })).status).toBe(404);
+    expect(
+      (await b.patch(`/api/v1/account/addresses/${first.body.id}`, { city: "Hacked" })).status,
+    ).toBe(404);
     expect((await b.del(`/api/v1/account/addresses/${first.body.id}`)).status).toBe(404);
-    expect((await prisma.address.findUniqueOrThrow({ where: { id: first.body.id } })).city).toBe("Bengaluru");
+    expect((await prisma.address.findUniqueOrThrow({ where: { id: first.body.id } })).city).toBe(
+      "Bengaluru",
+    );
 
-    expect((await a.patch(`/api/v1/account/addresses/${first.body.id}`, { city: "Mysuru" })).body.city).toBe("Mysuru");
+    expect(
+      (await a.patch(`/api/v1/account/addresses/${first.body.id}`, { city: "Mysuru" })).body.city,
+    ).toBe("Mysuru");
     expect((await a.del(`/api/v1/account/addresses/${first.body.id}`)).status).toBe(200);
   });
 });
@@ -150,15 +208,22 @@ describe("orders + guest merge", () => {
   it("links guest orders on registration and only lists own orders", async () => {
     const { variant } = await seedProduct({ stock: 20 });
     const token = await addToCart(app, variant.id, 1);
-    const guest = await checkout(app, token, { email: "guest@example.com", paymentProvider: "MANUAL" });
+    const guest = await checkout(app, token, {
+      email: "guest@example.com",
+      paymentProvider: "MANUAL",
+    });
     expect(guest.status).toBe(201);
     const orderNumber = guest.body.order.orderNumber as string;
-    expect((await prisma.order.findUniqueOrThrow({ where: { orderNumber } })).customerId).toBeNull();
+    expect(
+      (await prisma.order.findUniqueOrThrow({ where: { orderNumber } })).customerId,
+    ).toBeNull();
 
     const g = await registerCustomer(app, "guest@example.com");
     const other = await registerCustomer(app, "other@example.com");
     const mine = await g.get("/api/v1/account/orders");
-    expect(mine.body.items.map((o: { orderNumber: string }) => o.orderNumber)).toContain(orderNumber);
+    expect(mine.body.items.map((o: { orderNumber: string }) => o.orderNumber)).toContain(
+      orderNumber,
+    );
     expect((await g.get(`/api/v1/account/orders/${orderNumber}`)).status).toBe(200);
     // IDOR: another customer gets 404, and sees nothing in their list
     expect((await other.get(`/api/v1/account/orders/${orderNumber}`)).status).toBe(404);
@@ -170,8 +235,20 @@ describe("feature flag + admin", () => {
   it("returns 403 on /account/* when customerAccounts is disabled, guest checkout still works", async () => {
     const admin = await loginAdmin(app);
     await admin.put("/api/v1/admin/settings", { features: { customerAccounts: false } });
-    expect((await request(app).post("/api/v1/account/register").send({ email: "off@example.com", password: PW })).status).toBe(403);
-    expect((await request(app).post("/api/v1/account/login").send({ email: "off@example.com", password: PW })).status).toBe(403);
+    expect(
+      (
+        await request(app)
+          .post("/api/v1/account/register")
+          .send({ email: "off@example.com", password: PW })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .post("/api/v1/account/login")
+          .send({ email: "off@example.com", password: PW })
+      ).status,
+    ).toBe(403);
     const { variant } = await seedProduct();
     const token = await addToCart(app, variant.id, 1);
     expect((await checkout(app, token, { paymentProvider: "MANUAL" })).status).toBe(201);
@@ -192,10 +269,20 @@ describe("feature flag + admin", () => {
     await createAdminWithRole("ORDER_MANAGER", "om@test.example");
     const om = await loginAdmin(app, "om@test.example", "Another-Pass-123");
     expect((await om.get("/api/v1/admin/customers")).status).toBe(200);
-    expect((await om.patch(`/api/v1/admin/customers/${c.id}`, { isActive: false })).status).toBe(403);
+    expect((await om.patch(`/api/v1/admin/customers/${c.id}`, { isActive: false })).status).toBe(
+      403,
+    );
 
-    expect((await admin.patch(`/api/v1/admin/customers/${c.id}`, { isActive: false })).body.isActive).toBe(false);
+    expect(
+      (await admin.patch(`/api/v1/admin/customers/${c.id}`, { isActive: false })).body.isActive,
+    ).toBe(false);
     expect((await c.get("/api/v1/account/me")).status).toBe(401);
-    expect((await request(app).post("/api/v1/account/login").send({ email: "adm-target@example.com", password: PW })).status).toBe(401);
+    expect(
+      (
+        await request(app)
+          .post("/api/v1/account/login")
+          .send({ email: "adm-target@example.com", password: PW })
+      ).status,
+    ).toBe(401);
   });
 });

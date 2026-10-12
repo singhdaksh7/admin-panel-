@@ -573,8 +573,8 @@ export function register(ctx: AppContext): ModuleRoutes {
         addresses: c.addresses,
         ordersSummary: {
           count: agg._count,
-          totalSpent: (agg._sum.total ?? 0).toString(),
-          recent: recent.map((o) => ({ ...o, total: o.total.toString() })),
+          totalSpent: (agg._sum.total ?? 0).toFixed(2),
+          recent: recent.map((o) => ({ ...o, total: o.total.toFixed(2) })),
         },
       });
     }),

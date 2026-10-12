@@ -58,7 +58,9 @@ export async function seedProduct(o: SeedOpts = {}) {
 }
 
 export async function seedCategory(name: string, parentId?: string) {
-  return prisma.category.create({ data: { name, slug: `${name.toLowerCase()}-${uid()}`, parentId } });
+  return prisma.category.create({
+    data: { name, slug: `${name.toLowerCase()}-${uid()}`, parentId },
+  });
 }
 
 export const addr = (over: Record<string, unknown> = {}) => ({
@@ -85,23 +87,39 @@ export interface CustomerHandle {
   get: (u: string) => request.Test;
 }
 
-function handle(agent: ReturnType<typeof request.agent>, csrf: string, id: string, email: string): CustomerHandle {
+function handle(
+  agent: ReturnType<typeof request.agent>,
+  csrf: string,
+  id: string,
+  email: string,
+): CustomerHandle {
   return {
     agent,
     csrf,
     id,
     email,
     get: (u) => agent.get(u),
-    post: (u, b) => agent.post(u).set("x-csrf-token", csrf).send(b ?? {}),
-    patch: (u, b) => agent.patch(u).set("x-csrf-token", csrf).send(b ?? {}),
+    post: (u, b) =>
+      agent
+        .post(u)
+        .set("x-csrf-token", csrf)
+        .send(b ?? {}),
+    patch: (u, b) =>
+      agent
+        .patch(u)
+        .set("x-csrf-token", csrf)
+        .send(b ?? {}),
     del: (u) => agent.delete(u).set("x-csrf-token", csrf),
   };
 }
 
 export async function registerCustomer(app: Express, email: string, password = PW) {
   const agent = request.agent(app);
-  const res = await agent.post("/api/v1/account/register").send({ email, password, firstName: "Test" });
-  if (res.status !== 201) throw new Error(`register failed ${res.status} ${JSON.stringify(res.body)}`);
+  const res = await agent
+    .post("/api/v1/account/register")
+    .send({ email, password, firstName: "Test" });
+  if (res.status !== 201)
+    throw new Error(`register failed ${res.status} ${JSON.stringify(res.body)}`);
   return handle(agent, res.body.csrfToken, res.body.customer.id, email);
 }
 

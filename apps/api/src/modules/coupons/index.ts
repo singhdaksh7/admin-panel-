@@ -51,9 +51,9 @@ function dto(c: Prisma.CouponGetPayload<{ include: typeof include }>) {
   const { products, categories, ...rest } = c;
   return {
     ...rest,
-    value: c.value.toString(),
-    minOrderAmount: c.minOrderAmount?.toString() ?? null,
-    maxDiscount: c.maxDiscount?.toString() ?? null,
+    value: c.value.toFixed(2),
+    minOrderAmount: c.minOrderAmount?.toFixed(2) ?? null,
+    maxDiscount: c.maxDiscount?.toFixed(2) ?? null,
     productIds: products.map((p) => p.productId),
     categoryIds: categories.map((x) => x.categoryId),
   };
@@ -136,7 +136,7 @@ export function register(ctx: AppContext): ModuleRoutes {
       if (!before) throw AppError.notFound("Coupon");
       refine({
         discountType: b.discountType ?? before.discountType,
-        value: b.value ?? before.value.toString(),
+        value: b.value ?? before.value.toFixed(2),
         startsAt: b.startsAt === undefined ? before.startsAt : b.startsAt,
         endsAt: b.endsAt === undefined ? before.endsAt : b.endsAt,
       });

@@ -16,12 +16,12 @@ export function publicOrderDto(o: PublicOrder) {
     paymentStatus: o.paymentStatus,
     currency: o.currency,
     email: o.email,
-    subtotal: o.subtotal.toString(),
-    discount: o.discountTotal.toString(),
-    shipping: o.shippingTotal.toString(),
-    tax: o.taxTotal.toString(),
+    subtotal: o.subtotal.toFixed(2),
+    discount: o.discountTotal.toFixed(2),
+    shipping: o.shippingTotal.toFixed(2),
+    tax: o.taxTotal.toFixed(2),
     taxBreakdown: o.taxBreakdown,
-    total: o.total.toString(),
+    total: o.total.toFixed(2),
     couponCode: o.couponCode,
     shippingMethod: o.shippingMethodName,
     shippingAddress: o.shippingAddress,
@@ -37,12 +37,12 @@ export function publicOrderDto(o: PublicOrder) {
       sku: i.sku,
       imageUrl: i.imageUrl,
       attributes: i.attributes,
-      unitPrice: i.unitPrice.toString(),
+      unitPrice: i.unitPrice.toFixed(2),
       quantity: i.quantity,
-      discount: i.discount.toString(),
+      discount: i.discount.toFixed(2),
       taxRate: i.taxRate.toString(),
-      taxAmount: i.taxAmount.toString(),
-      lineTotal: i.lineTotal.toString(),
+      taxAmount: i.taxAmount.toFixed(2),
+      lineTotal: i.lineTotal.toFixed(2),
     })),
     timeline: o.events
       .filter((e) => e.type !== "NOTE")
@@ -50,7 +50,7 @@ export function publicOrderDto(o: PublicOrder) {
     payments: o.payments.map((p) => ({
       provider: p.provider,
       status: p.status,
-      amount: p.amount.toString(),
+      amount: p.amount.toFixed(2),
     })),
   };
 }
