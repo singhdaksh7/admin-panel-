@@ -11,6 +11,12 @@ import { register as filters } from "./filters";
 import { register as reviews } from "./reviews";
 import { register as blog } from "./blog";
 import { register as seo } from "./seo";
+import { register as customers } from "./customers";
+import { register as cart } from "./cart";
+import { register as coupons } from "./coupons";
+import { register as shippingMethods } from "./shipping-methods";
+import { register as checkout } from "./checkout";
+import { register as orders } from "./orders";
 
 /**
  * Feature module registry. Order = mount order.
@@ -30,4 +36,10 @@ export const modules: ModuleRegister[] = [
   reviews,
   blog,
   seo,
+  customers,
+  cart,
+  coupons,
+  shippingMethods,
+  checkout,
+  orders,
 ];

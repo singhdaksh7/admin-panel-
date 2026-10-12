@@ -1,4 +1,5 @@
 import type { AppContext } from "./context";
+import { expireUnpaidOrders } from "./modules/orders/service";
 
 /** Periodic housekeeping. Modules may push tasks onto `tasks` (kept in one place for visibility). */
 export const tasks: Array<{
@@ -17,6 +18,13 @@ export const tasks: Array<{
       await ctx.prisma.idempotencyKey.deleteMany({
         where: { createdAt: { lt: new Date(Date.now() - 48 * 3600_000) } },
       });
+    },
+  },
+  {
+    name: "expire-unpaid-orders",
+    everyMs: 5 * 60 * 1000,
+    run: async (ctx) => {
+      await expireUnpaidOrders(ctx);
     },
   },
 ];
