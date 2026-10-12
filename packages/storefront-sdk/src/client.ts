@@ -331,9 +331,11 @@ export function createCommerceClient(options: CommerceClientOptions) {
         t.setCsrfToken(null);
       }
     },
-    /** Current customer + (re)loads the CSRF token. Call once on app start to restore a session. */
+    /** Current customer + (re)loads the CSRF token. Call once on app start to restore a session; rejects with 401 when signed out. */
     me: async (c?: CallOptions) => {
-      const s = await get<AuthSession>("/account/me", undefined, { auth: true, ...c });
+      // A probe: no refresh-and-retry (the refresh endpoint needs the very same cookie), so an
+      // anonymous visitor costs exactly one 401.
+      const s = await get<AuthSession>("/account/me", undefined, c);
       t.storeSession(s);
       return s;
     },

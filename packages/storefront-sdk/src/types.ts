@@ -574,8 +574,8 @@ export interface Order {
 
 /**
  * Provider-specific payload for completing payment in the browser.
- *  - RAZORPAY: `{ keyId, providerOrderId, amount, currency, name? }` -> open Razorpay Checkout
- *  - MOCK (non-production only): `{ mock: true, providerOrderId, amount, currency }`
+ *  - RAZORPAY: `{ keyId, providerOrderId, amount (integer MINOR units), currency, name? }` -> open Razorpay Checkout
+ *  - MOCK (non-production only): `{ mock: true, providerOrderId, amount (decimal string), currency }`
  *  - MANUAL: `{ manual: true }` (cash on delivery – nothing to do)
  */
 export type ClientPayload = Record<string, unknown> & {

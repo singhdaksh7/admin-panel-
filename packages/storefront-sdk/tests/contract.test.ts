@@ -60,11 +60,12 @@ const address = {
 };
 
 describe.skipIf(!API_URL)("SDK <-> real API contract", () => {
-  const commerce = newClient();
+  let commerce: CommerceClient;
   let product: ProductDetail | undefined;
   let variant: ProductVariant | undefined;
 
   beforeAll(async () => {
+    commerce = newClient();
     const list = await commerce.products.list({ pageSize: 50, inStock: true });
     for (const item of list.items) {
       const detail = await commerce.products.getBySlug(item.slug);
