@@ -5,13 +5,24 @@ const uid = () => `${Date.now().toString(36)}${(n++).toString(36)}`;
 
 export async function mkCategory(name: string, parentId?: string | null, extra: object = {}) {
   return prisma.category.create({
-    data: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), parentId: parentId ?? null, ...extra },
+    data: {
+      name,
+      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      parentId: parentId ?? null,
+      ...extra,
+    },
   });
 }
 
 export async function mkMedia(key = `m-${uid()}.jpg`) {
   return prisma.media.create({
-    data: { storageKey: key, provider: "LOCAL", filename: key, mimeType: "image/jpeg", sizeBytes: 10 },
+    data: {
+      storageKey: key,
+      provider: "LOCAL",
+      filename: key,
+      mimeType: "image/jpeg",
+      sizeBytes: 10,
+    },
   });
 }
 
@@ -48,7 +59,13 @@ export async function mkProduct(o: ProductOpts) {
           price: o.price ?? "10.00",
           isDefault: true,
           ...(o.variantAttributeValueIds
-            ? { attributes: { create: o.variantAttributeValueIds.map((attributeValueId) => ({ attributeValueId })) } }
+            ? {
+                attributes: {
+                  create: o.variantAttributeValueIds.map((attributeValueId) => ({
+                    attributeValueId,
+                  })),
+                },
+              }
             : {}),
           ...(o.onHand !== null && o.onHand !== undefined
             ? { inventory: { create: { onHand: o.onHand, trackInventory: true } } }
@@ -57,7 +74,11 @@ export async function mkProduct(o: ProductOpts) {
       },
       ...(o.tagIds ? { tags: { create: o.tagIds.map((tagId) => ({ tagId })) } } : {}),
       ...(o.attributeValueIds
-        ? { attributeValues: { create: o.attributeValueIds.map((attributeValueId) => ({ attributeValueId })) } }
+        ? {
+            attributeValues: {
+              create: o.attributeValueIds.map((attributeValueId) => ({ attributeValueId })),
+            },
+          }
         : {}),
       ...(o.collectionIds
         ? { collections: { create: o.collectionIds.map((collectionId) => ({ collectionId })) } }

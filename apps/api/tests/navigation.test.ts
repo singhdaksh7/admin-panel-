@@ -1,5 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { bootApp, createAdminWithRole, loginAdmin, prisma, request, type AdminSessionHandle } from "./helpers";
+import {
+  bootApp,
+  createAdminWithRole,
+  loginAdmin,
+  prisma,
+  request,
+  type AdminSessionHandle,
+} from "./helpers";
 import { mkCategory, mkMedia } from "./contentFixtures";
 
 let app: Awaited<ReturnType<typeof bootApp>>["app"];
@@ -11,7 +18,12 @@ beforeAll(async () => {
   admin = await b.admin();
 });
 
-type Item = { label: string; url: string | null; children: Item[]; promo?: Record<string, unknown> | null };
+type Item = {
+  label: string;
+  url: string | null;
+  children: Item[];
+  promo?: Record<string, unknown> | null;
+};
 const pubMenu = async (q = "") => (await request(app).get(`/api/v1/navigation${q}`)).body;
 
 describe("navigation tree", () => {
@@ -53,10 +65,20 @@ describe("navigation tree", () => {
 
     const body = await pubMenu();
     const items = body.items as Item[];
-    expect(items.map((i) => i.url)).toEqual(["/", "/category/men", "/collection/summer", "/pages/about", "https://example.com"]);
+    expect(items.map((i) => i.url)).toEqual([
+      "/",
+      "/category/men",
+      "/collection/summer",
+      "/pages/about",
+      "https://example.com",
+    ]);
     // explicit "Shirts!" child + auto Pants (Shirts not duplicated, Retired inactive skipped)
     expect(items[1]!.children.map((c) => c.url)).toEqual(["/category/shirts", "/category/pants"]);
-    expect(items[1]!.promo).toMatchObject({ title: "Big sale", mediaUrl: "promo.jpg", url: "/sale" });
+    expect(items[1]!.promo).toMatchObject({
+      title: "Big sale",
+      mediaUrl: "promo.jpg",
+      url: "/sale",
+    });
     expect(JSON.stringify(body)).not.toContain("_autoChildren");
     // device flags are returned, not filtered
     expect(items[2]).toMatchObject({ showMobile: false, showDesktop: true });
@@ -68,16 +90,27 @@ describe("navigation tree", () => {
     const r = await request(app).get("/api/v1/navigation");
     expect(r.headers["cache-control"]).toMatch(/max-age=60/);
     expect(r.headers.etag).toBeTruthy();
-    const again = await request(app).get("/api/v1/navigation").set("If-None-Match", r.headers.etag!);
+    const again = await request(app)
+      .get("/api/v1/navigation")
+      .set("If-None-Match", r.headers.etag!);
     expect(again.status).toBe(304);
   });
 
   it("skips inactive items and links to inactive/missing/unpublished targets", async () => {
     const live = await mkCategory("Live");
     const dead = await mkCategory("Dead", null, { isActive: false });
-    const col = await prisma.collection.create({ data: { name: "Off", slug: "off", isActive: false } });
+    const col = await prisma.collection.create({
+      data: { name: "Off", slug: "off", isActive: false },
+    });
     await prisma.page.create({ data: { slug: "drafty", title: "D", status: "DRAFT" } });
-    await prisma.page.create({ data: { slug: "later", title: "L", status: "PUBLISHED", publishAt: new Date(Date.now() + 1e8) } });
+    await prisma.page.create({
+      data: {
+        slug: "later",
+        title: "L",
+        status: "PUBLISHED",
+        publishAt: new Date(Date.now() + 1e8),
+      },
+    });
     const put = await admin.put("/api/v1/admin/navigation/footer", {
       items: [
         { label: "Live", type: "CATEGORY", categoryId: live.id },
@@ -87,7 +120,14 @@ describe("navigation tree", () => {
         { label: "Later", type: "PAGE", pageSlug: "later" },
         { label: "Nope", type: "PAGE", pageSlug: "missing" },
         { label: "Inactive", type: "LINK", url: "/x", active: false },
-        { label: "Parent", type: "MEGA", children: [{ label: "gone", type: "LINK", url: "/g", active: false }, { label: "stay", type: "LINK", url: "/s" }] },
+        {
+          label: "Parent",
+          type: "MEGA",
+          children: [
+            { label: "gone", type: "LINK", url: "/g", active: false },
+            { label: "stay", type: "LINK", url: "/s" },
+          ],
+        },
       ],
     });
     expect(put.status).toBe(200);
@@ -101,7 +141,9 @@ describe("navigation tree", () => {
 
   it("returns all menus with menu=all, empty header by default, 404 for unknown", async () => {
     const all = await pubMenu("?menu=all");
-    expect(all.menus.map((m: { key: string }) => m.key)).toEqual(expect.arrayContaining(["header", "footer"]));
+    expect(all.menus.map((m: { key: string }) => m.key)).toEqual(
+      expect.arrayContaining(["header", "footer"]),
+    );
     await prisma.navigationMenu.deleteMany({});
     expect((await pubMenu()).items).toEqual([]);
     expect((await request(app).get("/api/v1/navigation?menu=zzz")).status).toBe(404);
@@ -113,7 +155,9 @@ describe("navigation tree", () => {
       type: "MEGA",
       children: n > 1 ? [deep(n - 1)] : [],
     });
-    expect((await admin.put("/api/v1/admin/navigation/custom", { items: [deep(4)] })).status).toBe(200);
+    expect((await admin.put("/api/v1/admin/navigation/custom", { items: [deep(4)] })).status).toBe(
+      200,
+    );
     const tooDeep = await admin.put("/api/v1/admin/navigation/custom", { items: [deep(5)] });
     expect(tooDeep.status).toBe(422);
     expect(JSON.stringify(tooDeep.body)).toMatch(/deeper than 4/);
@@ -141,15 +185,26 @@ describe("navigation tree", () => {
     expect(JSON.stringify(dup.body)).toMatch(/duplicate or cyclic/);
     // nested self-reference by id
     const cyc = await admin.put("/api/v1/admin/navigation/custom", {
-      items: [{ id: "p", label: "a", type: "MEGA", children: [{ id: "p", label: "b", type: "LINK", url: "/b" }] }],
+      items: [
+        {
+          id: "p",
+          label: "a",
+          type: "MEGA",
+          children: [{ id: "p", label: "b", type: "LINK", url: "/b" }],
+        },
+      ],
     });
     expect(cyc.status).toBe(422);
     expect((await admin.put("/api/v1/admin/navigation/Bad Key", { items: [] })).status).toBe(422);
   });
 
   it("save is replace-all and transactional (failed save keeps old tree)", async () => {
-    await admin.put("/api/v1/admin/navigation/swap", { items: [{ label: "one", type: "LINK", url: "/1" }] });
-    await admin.put("/api/v1/admin/navigation/swap", { items: [{ label: "two", type: "LINK", url: "/2" }] });
+    await admin.put("/api/v1/admin/navigation/swap", {
+      items: [{ label: "one", type: "LINK", url: "/1" }],
+    });
+    await admin.put("/api/v1/admin/navigation/swap", {
+      items: [{ label: "two", type: "LINK", url: "/2" }],
+    });
     expect((await pubMenu("?menu=swap")).items.map((i: Item) => i.label)).toEqual(["two"]);
     await admin.put("/api/v1/admin/navigation/swap", { items: [{ label: "bad", type: "LINK" }] });
     expect((await pubMenu("?menu=swap")).items.map((i: Item) => i.label)).toEqual(["two"]);
@@ -159,7 +214,9 @@ describe("navigation tree", () => {
     expect(again.status).toBe(200);
     expect(again.body.items[0].id).toBe(cur.body.items[0].id);
     // but not stolen from another menu
-    const steal = await admin.put("/api/v1/admin/navigation/other", { items: [{ id: cur.body.items[0].id, label: "x", type: "LINK", url: "/x" }] });
+    const steal = await admin.put("/api/v1/admin/navigation/other", {
+      items: [{ id: cur.body.items[0].id, label: "x", type: "LINK", url: "/x" }],
+    });
     expect(steal.status).toBe(422);
   });
 });

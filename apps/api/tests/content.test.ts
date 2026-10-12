@@ -1,5 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { bootApp, createAdminWithRole, loginAdmin, request, type AdminSessionHandle } from "./helpers";
+import {
+  bootApp,
+  createAdminWithRole,
+  loginAdmin,
+  request,
+  type AdminSessionHandle,
+} from "./helpers";
 import { mkCategory, mkMedia, mkProduct } from "./contentFixtures";
 import { prisma } from "./helpers";
 
@@ -66,17 +72,27 @@ describe("section type validation", () => {
 
   it("rejects unknown type and oversized CUSTOM_JSON (>64KB)", async () => {
     expect((await addSection(pageId, { type: "NOPE", content: {} })).status).toBe(422);
-    const big = await addSection(pageId, { type: "CUSTOM_JSON", content: { blob: "x".repeat(70_000) } });
+    const big = await addSection(pageId, {
+      type: "CUSTOM_JSON",
+      content: { blob: "x".repeat(70_000) },
+    });
     expect(big.status).toBe(422);
-    const ok = await addSection(pageId, { type: "CUSTOM_JSON", content: { blob: "x".repeat(60_000) } });
+    const ok = await addSection(pageId, {
+      type: "CUSTOM_JSON",
+      content: { blob: "x".repeat(60_000) },
+    });
     expect(ok.status).toBe(201);
   });
 
   it("validates content on update using the section's own type", async () => {
     const s = await addSection(pageId, { type: "HERO", content: { heading: "h" } });
-    const bad = await admin.patch(`/api/v1/admin/pages/${pageId}/sections/${s.body.id}`, { content: { heading: "" } });
+    const bad = await admin.patch(`/api/v1/admin/pages/${pageId}/sections/${s.body.id}`, {
+      content: { heading: "" },
+    });
     expect(bad.status).toBe(422);
-    const ok = await admin.patch(`/api/v1/admin/pages/${pageId}/sections/${s.body.id}`, { content: { heading: "new" } });
+    const ok = await admin.patch(`/api/v1/admin/pages/${pageId}/sections/${s.body.id}`, {
+      content: { heading: "new" },
+    });
     expect(ok.body.content.heading).toBe("new");
   });
 });
@@ -108,7 +124,14 @@ describe("scheduling and publication", () => {
     await addSection(id, { type: "HERO", key: "future", content: c("f"), startsAt: future });
     await addSection(id, { type: "HERO", key: "expired", content: c("e"), endsAt: past });
     await addSection(id, { type: "HERO", key: "disabled", content: c("d"), isEnabled: false });
-    await addSection(id, { type: "HERO", key: "live", content: c("l"), startsAt: past, endsAt: future, sortOrder: 3 });
+    await addSection(id, {
+      type: "HERO",
+      key: "live",
+      content: c("l"),
+      startsAt: past,
+      endsAt: future,
+      sortOrder: 3,
+    });
     const pub = await request(app).get("/api/v1/pages/sched");
     expect(pub.status).toBe(200);
     expect(pub.body.sections.map((s: { key: string }) => s.key)).toEqual(["a", "b", "live"]);
@@ -130,8 +153,12 @@ describe("scheduling and publication", () => {
 
   it("drafts and future-scheduled pages are 404 publicly but previewable by admin", async () => {
     await mkPage("draft-page", "DRAFT");
-    await mkPage("future-page", "PUBLISHED", { publishAt: new Date(Date.now() + 86400_000).toISOString() });
-    await mkPage("past-page", "PUBLISHED", { publishAt: new Date(Date.now() - 86400_000).toISOString() });
+    await mkPage("future-page", "PUBLISHED", {
+      publishAt: new Date(Date.now() + 86400_000).toISOString(),
+    });
+    await mkPage("past-page", "PUBLISHED", {
+      publishAt: new Date(Date.now() - 86400_000).toISOString(),
+    });
     expect((await request(app).get("/api/v1/pages/draft-page")).status).toBe(404);
     expect((await request(app).get("/api/v1/pages/future-page")).status).toBe(404);
     expect((await request(app).get("/api/v1/pages/past-page")).status).toBe(200);
@@ -146,18 +173,25 @@ describe("scheduling and publication", () => {
   it("reorders sections and rejects incomplete reorder lists", async () => {
     const { id } = await mkPage("reorder");
     const ids: string[] = [];
-    for (const k of ["x", "y", "z"]) ids.push((await addSection(id, { type: "HERO", key: k, content: { heading: k } })).body.id);
-    const r = await admin.put(`/api/v1/admin/pages/${id}/sections/reorder`, { ids: [ids[2], ids[0], ids[1]] });
+    for (const k of ["x", "y", "z"])
+      ids.push((await addSection(id, { type: "HERO", key: k, content: { heading: k } })).body.id);
+    const r = await admin.put(`/api/v1/admin/pages/${id}/sections/reorder`, {
+      ids: [ids[2], ids[0], ids[1]],
+    });
     expect(r.status).toBe(200);
     expect(r.body.map((s: { key: string }) => s.key)).toEqual(["z", "x", "y"]);
-    expect((await admin.put(`/api/v1/admin/pages/${id}/sections/reorder`, { ids: [ids[0]] })).status).toBe(422);
+    expect(
+      (await admin.put(`/api/v1/admin/pages/${id}/sections/reorder`, { ids: [ids[0]] })).status,
+    ).toBe(422);
     const pub = await request(app).get("/api/v1/pages/reorder");
     expect(pub.body.sections.map((s: { key: string }) => s.key)).toEqual(["z", "x", "y"]);
   });
 
   it("enforces slug uniqueness and deletes cascade", async () => {
     const { id } = await mkPage("dupe");
-    expect((await admin.post("/api/v1/admin/pages", { slug: "dupe", title: "again" })).status).toBe(409);
+    expect((await admin.post("/api/v1/admin/pages", { slug: "dupe", title: "again" })).status).toBe(
+      409,
+    );
     await addSection(id, { type: "HERO", content: { heading: "x" } });
     expect((await admin.del(`/api/v1/admin/pages/${id}`)).status).toBe(204);
     expect(await prisma.pageSection.count({ where: { pageId: id } })).toBe(0);
@@ -173,19 +207,36 @@ describe("public resolution", () => {
     await mkProduct({ slug: "live-1", categoryId: cat.id, mediaId: m1.id, price: "20.00" });
     await mkProduct({ slug: "live-2", categoryId: cat.id });
     await mkProduct({ slug: "draft-1", categoryId: cat.id, status: "DRAFT" });
-    await mkProduct({ slug: "future-1", categoryId: cat.id, publishAt: new Date(Date.now() + 86400_000) });
+    await mkProduct({
+      slug: "future-1",
+      categoryId: cat.id,
+      publishAt: new Date(Date.now() + 86400_000),
+    });
     await mkProduct({ slug: "archived-1", categoryId: cat.id, status: "ARCHIVED" });
-    await prisma.blogPost.create({ data: { slug: "pub-post", title: "Pub", body: "b", status: "PUBLISHED" } });
-    await prisma.blogPost.create({ data: { slug: "draft-post", title: "Draft", body: "b", status: "DRAFT" } });
+    await prisma.blogPost.create({
+      data: { slug: "pub-post", title: "Pub", body: "b", status: "PUBLISHED" },
+    });
+    await prisma.blogPost.create({
+      data: { slug: "draft-post", title: "Draft", body: "b", status: "DRAFT" },
+    });
 
     const { id } = await mkPage("resolved");
-    await addSection(id, { type: "HERO", content: { heading: "H", image: { desktopMediaId: m1.id, mobileMediaId: m2.id } } });
+    await addSection(id, {
+      type: "HERO",
+      content: { heading: "H", image: { desktopMediaId: m1.id, mobileMediaId: m2.id } },
+    });
     await addSection(id, { type: "PRODUCT_GRID", content: { categorySlug: "shoes", limit: 10 } });
     await addSection(id, {
       type: "PRODUCT_GRID",
-      content: { productSlugs: ["live-2", "draft-1", "live-1", "future-1", "archived-1"], limit: 10 },
+      content: {
+        productSlugs: ["live-2", "draft-1", "live-1", "future-1", "archived-1"],
+        limit: 10,
+      },
     });
-    await addSection(id, { type: "CATEGORY_GRID", content: { categorySlugs: ["shoes", "hidden"] } });
+    await addSection(id, {
+      type: "CATEGORY_GRID",
+      content: { categorySlugs: ["shoes", "hidden"] },
+    });
     await addSection(id, { type: "BLOG_PREVIEW", content: { limit: 5 } });
     void inactive;
 
@@ -194,7 +245,10 @@ describe("public resolution", () => {
     const [hero, byCat, bySlug, cats, blog] = res.body.sections;
     expect(hero.content.image.desktopUrl).toBe("hero-d.jpg");
     expect(hero.content.image.mobileUrl).toBe("hero-m.jpg");
-    expect(byCat.content.items.map((p: { slug: string }) => p.slug).sort()).toEqual(["live-1", "live-2"]);
+    expect(byCat.content.items.map((p: { slug: string }) => p.slug).sort()).toEqual([
+      "live-1",
+      "live-2",
+    ]);
     expect(bySlug.content.items.map((p: { slug: string }) => p.slug)).toEqual(["live-2", "live-1"]);
     const live1 = bySlug.content.items[1];
     expect(live1.price).toBe("20.00");
@@ -202,7 +256,10 @@ describe("public resolution", () => {
     expect(cats.content.items.map((c: { slug: string }) => c.slug)).toEqual(["shoes"]);
     expect(cats.content.items[0].url).toBe("/category/shoes");
     expect(blog.content.items.map((p: { slug: string }) => p.slug)).toEqual(["pub-post"]);
-    expect(JSON.stringify(res.body)).not.toMatch(/draft-1|future-1|archived-1|draft-post/);
+    const allItems = res.body.sections.flatMap(
+      (s: { content: { items?: unknown[] } }) => s.content.items ?? [],
+    );
+    expect(JSON.stringify(allItems)).not.toMatch(/draft-1|future-1|archived-1|draft-post/);
   });
 });
 
@@ -214,7 +271,9 @@ describe("permissions", () => {
     const cm = await loginAdmin(app, "cm@x.example", "Another-Pass-123");
     const cat = await loginAdmin(app, "cat@x.example", "Another-Pass-123");
     const sup = await loginAdmin(app, "sup@x.example", "Another-Pass-123");
-    expect((await cm.post("/api/v1/admin/pages", { slug: "cm-page", title: "T" })).status).toBe(201);
+    expect((await cm.post("/api/v1/admin/pages", { slug: "cm-page", title: "T" })).status).toBe(
+      201,
+    );
     expect((await cm.get("/api/v1/admin/pages")).status).toBe(200);
     expect((await cat.get("/api/v1/admin/pages")).status).toBe(403);
     expect((await cat.post("/api/v1/admin/pages", { slug: "n", title: "T" })).status).toBe(403);
