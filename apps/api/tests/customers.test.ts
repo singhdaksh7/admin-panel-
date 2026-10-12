@@ -1,3 +1,4 @@
+import { makeVerifyToken } from "../src/modules/customers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { bootApp, createAdminWithRole, loginAdmin, prisma, request } from "./helpers";
 import {
@@ -205,7 +206,7 @@ describe("addresses + IDOR", () => {
 });
 
 describe("orders + guest merge", () => {
-  it("links guest orders on registration and only lists own orders", async () => {
+  it("does NOT attach guest orders on registration; only after email verification", async () => {
     const { variant } = await seedProduct({ stock: 20 });
     const token = await addToCart(app, variant.id, 1);
     const guest = await checkout(app, token, {
@@ -214,12 +215,32 @@ describe("orders + guest merge", () => {
     });
     expect(guest.status).toBe(201);
     const orderNumber = guest.body.order.orderNumber as string;
+
+    // An attacker registering with the victim's address must NOT see the victim's orders.
+    const g = await registerCustomer(app, "guest@example.com");
+    const other = await registerCustomer(app, "other@example.com");
+    expect((await g.get("/api/v1/account/orders")).body.items).toHaveLength(0);
+    expect((await g.get(`/api/v1/account/orders/${orderNumber}`)).status).toBe(404);
     expect(
       (await prisma.order.findUniqueOrThrow({ where: { orderNumber } })).customerId,
     ).toBeNull();
 
-    const g = await registerCustomer(app, "guest@example.com");
-    const other = await registerCustomer(app, "other@example.com");
+    // forged / tampered tokens are rejected
+    const cust = await prisma.customer.findUniqueOrThrow({ where: { email: "guest@example.com" } });
+    const good = makeVerifyToken(process.env.SESSION_SECRET!, cust.id, cust.email);
+    const bad = makeVerifyToken("some-other-secret-some-other-secret-1", cust.id, cust.email);
+    expect(
+      (await request(app).post("/api/v1/account/verify-email").send({ token: bad })).status,
+    ).toBe(400);
+    const wrongEmail = makeVerifyToken(process.env.SESSION_SECRET!, cust.id, "victim@example.com");
+    expect(
+      (await request(app).post("/api/v1/account/verify-email").send({ token: wrongEmail })).status,
+    ).toBe(400);
+
+    // the mailbox owner follows the emailed link
+    expect(
+      (await request(app).post("/api/v1/account/verify-email").send({ token: good })).status,
+    ).toBe(200);
     const mine = await g.get("/api/v1/account/orders");
     expect(mine.body.items.map((o: { orderNumber: string }) => o.orderNumber)).toContain(
       orderNumber,

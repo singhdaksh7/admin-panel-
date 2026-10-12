@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import type { Customer, Prisma } from "@kash-commerce/database";
@@ -24,6 +25,40 @@ import { publicOrderDto, publicOrderInclude } from "../orders/dto";
 const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const MAX_FAILS = 5;
 const MAX_ADDRESSES = 20;
+const VERIFY_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Stateless email-verification token: base64url(payload).hmac. Proves control of the mailbox,
+ * which is required before earlier GUEST orders are attached to an account (otherwise anyone could
+ * register with a victim's email address and read their order history).
+ */
+export function makeVerifyToken(secret: string, customerId: string, emailAddr: string): string {
+  const payload = Buffer.from(
+    JSON.stringify({ c: customerId, e: emailAddr, x: Date.now() + VERIFY_TTL_MS }),
+  ).toString("base64url");
+  const mac = crypto.createHmac("sha256", secret).update(`verify:${payload}`).digest("base64url");
+  return `${payload}.${mac}`;
+}
+
+function readVerifyToken(secret: string, token: string): { c: string; e: string } | null {
+  const [payload, mac] = token.split(".");
+  if (!payload || !mac) return null;
+  const expect = crypto
+    .createHmac("sha256", secret)
+    .update(`verify:${payload}`)
+    .digest("base64url");
+  if (!safeEqual(mac, expect)) return null;
+  try {
+    const d = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      c: string;
+      e: string;
+      x: number;
+    };
+    return d.x > Date.now() ? { c: d.c, e: d.e } : null;
+  } catch {
+    return null;
+  }
+}
 
 const email = z
   .string()
@@ -92,6 +127,23 @@ export function register(ctx: AppContext): ModuleRoutes {
   const router = Router();
   const admin = Router();
   const authed = customerAuth(ctx, { required: true });
+
+  /** Attach earlier GUEST orders (same email) to a customer whose mailbox ownership is proven. */
+  async function claimGuestOrders(customerId: string, emailAddr: string) {
+    await p.order.updateMany({
+      where: { customerId: null, email: emailAddr },
+      data: { customerId },
+    });
+  }
+
+  async function sendVerification(c: Customer) {
+    const token = makeVerifyToken(ctx.env.SESSION_SECRET, c.id, c.email);
+    const base = ctx.env.CORS_ORIGINS[0] ?? ctx.env.PUBLIC_API_URL;
+    await notify(ctx, "customer.verify", c.email, {
+      name: c.firstName ?? c.email,
+      link: `${base}/account/verify-email?token=${token}`,
+    });
+  }
 
   // Failed-login backoff (Customer has no lockout columns). Per-process; the auth rate limiter backs it up.
   const throttle = new Map<string, { fails: number; until: number }>();
@@ -174,11 +226,8 @@ export function register(ctx: AppContext): ModuleRoutes {
           const c = existing
             ? await tx.customer.update({ where: { id: existing.id }, data })
             : await tx.customer.create({ data: { email: b.email, ...data } });
-          // guest -> account: claim earlier guest orders placed with this email
-          await tx.order.updateMany({
-            where: { customerId: null, email: b.email },
-            data: { customerId: c.id },
-          });
+          // NOTE: earlier guest orders are NOT attached here. That happens only after the email
+          // address is verified (verify-email / password reset) - see claimGuestOrders().
           return c;
         });
       } catch (e) {
@@ -191,6 +240,7 @@ export function register(ctx: AppContext): ModuleRoutes {
       await notify(ctx, "customer.welcome", customer.email, {
         name: customer.firstName ?? customer.email,
       });
+      await sendVerification(customer);
       res.status(201).json({ customer: customerDto(customer), csrfToken });
     }),
   );
@@ -274,6 +324,33 @@ export function register(ctx: AppContext): ModuleRoutes {
         }
       }
       clearCookie(res);
+      res.json({ ok: true });
+    }),
+  );
+
+  router.post(
+    "/account/verify-email",
+    limiters.auth,
+    h(async (req, res) => {
+      const { token } = parse(z.object({ token: z.string().min(20).max(1000) }), req.body);
+      const t = readVerifyToken(ctx.env.SESSION_SECRET, token);
+      const c = t ? await p.customer.findUnique({ where: { id: t.c } }) : null;
+      if (!t || !c || c.email !== t.e)
+        throw AppError.badRequest("Verification link is invalid or expired");
+      if (!c.emailVerified)
+        await p.customer.update({ where: { id: c.id }, data: { emailVerified: true } });
+      await claimGuestOrders(c.id, c.email);
+      res.json({ ok: true });
+    }),
+  );
+
+  router.post(
+    "/account/resend-verification",
+    limiters.auth,
+    authed,
+    h(async (req, res) => {
+      const c = await p.customer.findUniqueOrThrow({ where: { id: req.customer!.id } });
+      if (!c.emailVerified) await sendVerification(c);
       res.json({ ok: true });
     }),
   );
@@ -364,12 +441,17 @@ export function register(ctx: AppContext): ModuleRoutes {
           data: { usedAt: new Date() },
         });
         if (claimed.count === 0) throw AppError.badRequest("Reset link is invalid or expired");
-        await tx.customer.update({ where: { id: row.customerId }, data: { passwordHash } });
+        await tx.customer.update({
+          where: { id: row.customerId },
+          data: { passwordHash, emailVerified: true },
+        });
         await tx.customerSession.updateMany({
           where: { customerId: row.customerId, revokedAt: null },
           data: { revokedAt: new Date() },
         });
       });
+      const owner = await p.customer.findUnique({ where: { id: row.customerId } });
+      if (owner) await claimGuestOrders(owner.id, owner.email); // reset proves mailbox control
       res.json({ ok: true });
     }),
   );

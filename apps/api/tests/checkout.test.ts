@@ -1,3 +1,4 @@
+import { makeVerifyToken } from "../src/modules/customers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { bootApp, loginAdmin, prisma, request } from "./helpers";
 import {
@@ -482,7 +483,13 @@ describe("public order lookup", () => {
       JSON.stringify((await request(app).get(`/api/v1/orders/${n}?email=lookup@example.com`)).body),
     ).not.toMatch(/actorId|providerOrderId/);
 
-    const owner = await registerCustomer(app, "lookup@example.com"); // claims the guest order
+    const owner = await registerCustomer(app, "lookup@example.com");
+    const ownerRow = await prisma.customer.findUniqueOrThrow({
+      where: { email: "lookup@example.com" },
+    });
+    await request(app) // mailbox ownership proven -> guest order is attached
+      .post("/api/v1/account/verify-email")
+      .send({ token: makeVerifyToken(process.env.SESSION_SECRET!, ownerRow.id, ownerRow.email) });
     expect((await owner.get(`/api/v1/orders/${n}`)).status).toBe(200);
     const stranger = await registerCustomer(app, "stranger@example.com");
     expect((await stranger.get(`/api/v1/orders/${n}`)).status).toBe(404);

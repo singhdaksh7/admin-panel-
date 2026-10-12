@@ -10,6 +10,10 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     subject: "Welcome to {{storeName}}",
     body: "Hi {{name}},\n\nThanks for creating an account at {{storeName}}.",
   },
+  "customer.verify": {
+    subject: "Confirm your email address",
+    body: "Hi {{name}},\n\nConfirm your email address to see your earlier orders:\n{{link}}\n\nThe link is valid for 3 days.",
+  },
   "order.confirmation": {
     subject: "Order {{orderNumber}} confirmed",
     body: "Hi {{name}},\n\nWe received your order {{orderNumber}} totalling {{total}} {{currency}}.",
