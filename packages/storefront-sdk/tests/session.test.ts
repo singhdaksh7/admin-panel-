@@ -125,29 +125,11 @@ describe("cart token handling", () => {
     expect(calls[2]!.body).toEqual({ code: "SAVE10" });
   });
 
-  it("clear() removes every line and the coupon", async () => {
-    let lines = ["a", "b"];
-    let coupon: string | null = "X";
-    const view = () => ({
-      ...emptyCart("tok-clear-00001"),
-      items: lines.map((v) => ({ variantId: v })),
-      couponCode: coupon,
-    });
-    const { commerce, calls } = setup((c) => {
-      if (c.method === "DELETE" && c.path.includes("/items/"))
-        lines = lines.filter((l) => !c.path.endsWith(`/${l}`));
-      if (c.method === "DELETE" && c.path.endsWith("/coupon")) coupon = null;
-      return json(view());
-    });
+  it("clear() empties the cart with a single DELETE /cart", async () => {
+    const { commerce, calls } = setup(() => json(emptyCart("tok-clear-00001")));
     const res = await commerce.cart.clear();
     expect(res.items).toHaveLength(0);
-    expect(res.couponCode).toBeNull();
-    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
-      "GET /api/v1/cart",
-      "DELETE /api/v1/cart/items/a",
-      "DELETE /api/v1/cart/items/b",
-      "DELETE /api/v1/cart/coupon",
-    ]);
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(["DELETE /api/v1/cart"]);
   });
 
   it("merge() sends the anonymous token in the body", async () => {

@@ -109,6 +109,25 @@ export function publicSettings(s: Awaited<ReturnType<typeof getSettings>>) {
   };
 }
 
+/** Public settings + resolved logo/favicon URLs (storefronts cannot resolve media ids themselves). */
+export async function publicSettingsWithMedia(
+  ctx: AppContext,
+  s: Awaited<ReturnType<typeof getSettings>>,
+) {
+  const ids = [s.logoMediaId, s.faviconMediaId].filter((x): x is string => !!x);
+  const media = ids.length
+    ? await ctx.prisma.media.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, storageKey: true },
+      })
+    : [];
+  const url = (id: string | null) => {
+    const m = id ? media.find((x) => x.id === id) : undefined;
+    return m ? ctx.providers.storage.url(m.storageKey) : null;
+  };
+  return { ...publicSettings(s), logoUrl: url(s.logoMediaId), faviconUrl: url(s.faviconMediaId) };
+}
+
 export function register(ctx: AppContext): ModuleRoutes {
   const limiters = createLimiters(ctx.env.NODE_ENV !== "test");
   const pub = Router();
@@ -116,7 +135,7 @@ export function register(ctx: AppContext): ModuleRoutes {
     "/store/settings",
     limiters.publicRead,
     h(async (_req, res) => {
-      res.json(publicSettings(await getSettings(ctx)));
+      res.json(await publicSettingsWithMedia(ctx, await getSettings(ctx)));
     }),
   );
 

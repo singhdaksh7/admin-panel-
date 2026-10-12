@@ -19,6 +19,7 @@ export interface Limiters {
   publicRead: RequestHandler; // storefront GETs: generous
   auth: RequestHandler; // login/register/reset: strict, failures only
   checkout: RequestHandler; // checkout & payment
+  lookup: RequestHandler; // guest order lookup / tracking (enumeration-sensitive, but polled by status pages)
   adminApi: RequestHandler; // authenticated admin traffic
   write: RequestHandler; // public mutating requests (cart, reviews)
   webhook: RequestHandler; // provider webhooks
@@ -30,6 +31,7 @@ export function createLimiters(enabled: boolean): Limiters {
     publicRead: make({ windowMs: min, limit: 600 }, enabled),
     auth: make({ windowMs: 15 * min, limit: 20, skipSuccessfulRequests: true }, enabled),
     checkout: make({ windowMs: min, limit: 30 }, enabled),
+    lookup: make({ windowMs: min, limit: 90 }, enabled),
     adminApi: make({ windowMs: min, limit: 1200 }, enabled),
     write: make({ windowMs: min, limit: 120 }, enabled),
     webhook: make({ windowMs: min, limit: 300 }, enabled),

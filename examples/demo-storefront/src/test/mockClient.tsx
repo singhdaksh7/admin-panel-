@@ -25,6 +25,8 @@ export const settings: StoreSettings = {
   legalName: null,
   logoMediaId: null,
   faviconMediaId: null,
+  logoUrl: null,
+  faviconUrl: null,
   supportEmail: null,
   phone: null,
   address: null,

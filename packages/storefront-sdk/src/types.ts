@@ -74,6 +74,9 @@ export interface StoreSettings {
   legalName: string | null;
   logoMediaId: string | null;
   faviconMediaId: string | null;
+  /** Resolved public URLs of the logo / favicon (null when not set). */
+  logoUrl: string | null;
+  faviconUrl: string | null;
   supportEmail: string | null;
   phone: string | null;
   address: StoreAddress | null;

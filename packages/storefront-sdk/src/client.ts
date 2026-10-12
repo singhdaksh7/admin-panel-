@@ -215,13 +215,8 @@ export function createCommerceClient(options: CommerceClientOptions) {
       send<Cart>("POST", "/cart/coupon", { code }, { ...cartReq, ...c }),
     removeCoupon: (c?: CallOptions) =>
       send<Cart>("DELETE", "/cart/coupon", undefined, { ...cartReq, ...c }),
-    /** The API has no "empty cart" endpoint: this removes each line (and the coupon) in turn. */
-    clear: async (c?: CallOptions): Promise<Cart> => {
-      let current = await cart.get(c);
-      for (const line of current.items) current = await cart.remove(line.variantId, c);
-      if (current.couponCode) current = await cart.removeCoupon(c);
-      return current;
-    },
+    /** Empties the cart (all lines and the coupon) in one call. */
+    clear: (c?: CallOptions) => send<Cart>("DELETE", "/cart", undefined, { ...cartReq, ...c }),
     /** Merge the anonymous cart into the signed-in customer's cart (requires a session). */
     merge: async (c?: CallOptions): Promise<Cart> => {
       const cartToken = (await t.getCartToken()) ?? undefined;

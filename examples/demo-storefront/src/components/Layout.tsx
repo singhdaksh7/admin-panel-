@@ -83,7 +83,11 @@ export function Layout() {
       <header className="site-header">
         <div className="container header-row">
           <Link to="/" className="brand">
-            {name}
+            {settings?.logoUrl ? (
+              <img src={settings.logoUrl} alt={name} style={{ height: 32, display: "block" }} />
+            ) : (
+              name
+            )}
           </Link>
           <nav aria-label="Main">
             <ul className="nav">

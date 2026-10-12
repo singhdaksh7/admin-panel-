@@ -248,6 +248,23 @@ export function register(ctx: AppContext): ModuleRoutes {
     }),
   );
 
+  // empty the whole cart (items + coupon)
+  router.delete(
+    "/cart",
+    limiters.write,
+    opt,
+    h(async (req, res) => {
+      const cart = await findCart(ctx, req);
+      if (!cart) throw AppError.notFound("Cart");
+      await p.$transaction([
+        p.cartItem.deleteMany({ where: { cartId: cart.id } }),
+        p.cart.update({ where: { id: cart.id }, data: { couponCode: null } }),
+      ]);
+      await touch(ctx, cart);
+      await respond(req, res, cart.id);
+    }),
+  );
+
   router.delete(
     "/cart/items/:variantId",
     limiters.write,

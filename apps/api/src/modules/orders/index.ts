@@ -59,7 +59,7 @@ export function register(ctx: AppContext): ModuleRoutes {
   // ───────── public lookup: owning customer session OR orderNumber + matching email ─────────
   pub.get(
     "/orders/:orderNumber",
-    limiters.checkout,
+    limiters.lookup,
     customerAuth(ctx, { required: false }),
     h(async (req, res) => {
       const orderNumber = String(req.params.orderNumber).slice(0, 40);
