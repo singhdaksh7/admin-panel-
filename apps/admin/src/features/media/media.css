@@ -1,0 +1,30 @@
+.media-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.media-detail > img {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  background: var(--bg);
+  border-radius: 8px;
+}
+@media (max-width: 720px) {
+  .media-detail {
+    grid-template-columns: 1fr;
+  }
+}
+.media-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+.media-meta dt {
+  color: var(--muted);
+}
+.media-meta dd {
+  margin: 0;
+  word-break: break-word;
+}

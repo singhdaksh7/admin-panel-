@@ -28,6 +28,19 @@ export function NotFound() {
  * `routes: RouteObject[]` (paths relative to "/", wrapped in <Guard perm=...>). Add ONE line below per feature.
  */
 import { routes as accountRoutes } from "./features/account/routes";
+import { routes as couponRoutes } from "./features/coupons/routes";
+import { routes as reviewRoutes } from "./features/reviews/routes";
+import { routes as pageRoutes } from "./features/pages/routes";
+import { routes as navigationRoutes } from "./features/navigation/routes";
+import { routes as blogRoutes } from "./features/blog/routes";
+import { routes as mediaRoutes } from "./features/media/routes";
+import { routes as filterRoutes } from "./features/filters/routes";
+import { routes as seoRoutes } from "./features/seo/routes";
+import { routes as settingsRoutes } from "./features/settings/routes";
+import { routes as userRoutes } from "./features/users/routes";
+import { routes as roleRoutes } from "./features/roles/routes";
+import { routes as auditRoutes } from "./features/audit/routes";
+import { routes as integrationRoutes } from "./features/integrations/routes";
 
 export const appRoutes: RouteObject[] = [
   {
@@ -39,6 +52,19 @@ export const appRoutes: RouteObject[] = [
     ),
   },
   ...accountRoutes,
+  ...couponRoutes,
+  ...reviewRoutes,
+  ...pageRoutes,
+  ...navigationRoutes,
+  ...blogRoutes,
+  ...mediaRoutes,
+  ...filterRoutes,
+  ...seoRoutes,
+  ...settingsRoutes,
+  ...userRoutes,
+  ...roleRoutes,
+  ...auditRoutes,
+  ...integrationRoutes,
   { path: "*", element: <NotFound /> },
 ];
 

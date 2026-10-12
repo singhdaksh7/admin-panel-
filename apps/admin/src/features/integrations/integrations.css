@@ -1,0 +1,33 @@
+.int-section {
+  margin-top: 20px;
+}
+.int-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+.int-add {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+}
+@media (max-width: 520px) {
+  .int-add {
+    grid-template-columns: 1fr;
+  }
+}
+.int-h3 {
+  font-size: 14px;
+  margin: 14px 0 4px;
+}
+.int-secrets {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: grid;
+  gap: 4px;
+}
