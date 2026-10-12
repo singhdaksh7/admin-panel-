@@ -208,6 +208,25 @@ describe.skipIf(!API_URL)("SDK <-> real API contract", () => {
     expect((await c.cart.get()).items).toEqual([]);
   });
 
+  it("checkout with the store's default payment provider returns a client payload", async () => {
+    expect(variant).toBeDefined();
+    const c = newClient();
+    await c.cart.add({ variantId: variant!.id, quantity: 1 });
+    const r = await c.checkout.create({
+      email: `online+${stamp}@example.com`,
+      shippingAddress: address,
+    });
+    expect(r.order.orderNumber).toBeTruthy();
+    if (r.paymentRequired) {
+      // MOCK in dev: { mock: true, providerOrderId, amount, currency }; RAZORPAY: { keyId, ... }
+      expect(r.paymentProvider).toBeTruthy();
+      expect(r.clientPayload?.providerOrderId).toBeTruthy();
+      expect(r.order.paymentStatus).toBe("PENDING");
+    } else {
+      expect(r.order.status).toBe("CONFIRMED");
+    }
+  });
+
   it("customer account: register, session cookie + csrf, addresses, refresh, logout", async () => {
     const c = newClient();
     const email = `customer+${stamp}@example.com`;
