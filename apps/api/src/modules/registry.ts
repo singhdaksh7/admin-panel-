@@ -17,6 +17,11 @@ import { register as coupons } from "./coupons";
 import { register as shippingMethods } from "./shipping-methods";
 import { register as checkout } from "./checkout";
 import { register as orders } from "./orders";
+import { register as payments } from "./payments";
+import { register as shipments } from "./shipments";
+import { register as returns } from "./returns";
+import { register as invoices } from "./invoices";
+import { register as integrations } from "./integrations";
 
 /**
  * Feature module registry. Order = mount order.
@@ -42,4 +47,9 @@ export const modules: ModuleRegister[] = [
   shippingMethods,
   checkout,
   orders,
+  payments,
+  shipments,
+  returns,
+  invoices,
+  integrations,
 ];

@@ -30,7 +30,7 @@ export class RazorpayProvider implements PaymentProvider {
   private readonly webhookSecret: string;
   private readonly fetchFn: FetchLike;
   private readonly baseUrl: string;
-  private readonly displayName?: string;
+  private displayName?: string;
 
   constructor(opts: RazorpayOptions) {
     this.keyId = opts.keyId;
@@ -39,6 +39,11 @@ export class RazorpayProvider implements PaymentProvider {
     this.fetchFn = opts.fetch ?? ((url, init) => fetch(url, init));
     this.baseUrl = (opts.baseUrl ?? "https://api.razorpay.com").replace(/\/+$/, "");
     this.displayName = opts.displayName;
+  }
+
+  /** Applies non-secret admin settings (IntegrationSetting) at runtime. */
+  configure(opts: { displayName?: string }): void {
+    if (opts.displayName) this.displayName = opts.displayName;
   }
 
   private authHeader(): string {

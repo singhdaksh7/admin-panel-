@@ -40,8 +40,8 @@ export class ShiprocketProvider implements ShippingProvider {
   private readonly fetchFn: FetchLike;
   private readonly baseUrl: string;
   private readonly now: () => number;
-  private readonly pickupLocation: string;
-  private readonly pickupPostcode?: string;
+  private pickupLocation: string;
+  private pickupPostcode?: string;
   private readonly retryDelayMs: number;
   private token?: { value: string; expiresAt: number };
   private loginInFlight?: Promise<string>;
@@ -57,6 +57,12 @@ export class ShiprocketProvider implements ShippingProvider {
     this.pickupLocation = opts.pickupLocation ?? "Primary";
     this.pickupPostcode = opts.pickupPostcode;
     this.retryDelayMs = opts.retryDelayMs ?? 300;
+  }
+
+  /** Applies non-secret admin settings (IntegrationSetting) at runtime. Unset keys keep their value. */
+  configure(opts: { pickupLocation?: string; pickupPostcode?: string }): void {
+    if (opts.pickupLocation) this.pickupLocation = opts.pickupLocation;
+    if (opts.pickupPostcode) this.pickupPostcode = opts.pickupPostcode;
   }
 
   private login(force = false): Promise<string> {
@@ -217,7 +223,23 @@ export class ShiprocketProvider implements ShippingProvider {
   }
 
   async cancelShipment(providerShipmentId: string): Promise<void> {
-    const orderId = this.orderIds.get(providerShipmentId) ?? providerShipmentId;
+    let orderId = this.orderIds.get(providerShipmentId);
+    if (!orderId) {
+      // after a restart the shipment->order map is gone: resolve it from Shiprocket
+      try {
+        const info = await this.request(
+          "GET",
+          `/v1/external/shipments/${encodeURIComponent(providerShipmentId)}`,
+          undefined,
+          { retry: true },
+        );
+        const found = info.data?.order_id ?? info.order_id;
+        if (found !== undefined && found !== null) orderId = String(found);
+      } catch {
+        /* fall through to the shipment id */
+      }
+    }
+    orderId ??= providerShipmentId;
     await this.request("POST", "/v1/external/orders/cancel", { ids: [Number(orderId) || orderId] });
   }
 
