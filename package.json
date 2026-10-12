@@ -20,7 +20,8 @@
     "db:migrate:dev": "npm run migrate:dev -w @kash-commerce/database",
     "db:validate": "npm run validate -w @kash-commerce/database",
     "create-store": "tsx scripts/create-store/index.ts",
-    "create-admin": "tsx scripts/seed/create-admin.ts"
+    "create-admin": "tsx scripts/seed/create-admin.ts",
+    "test:scripts": "vitest run scripts"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
