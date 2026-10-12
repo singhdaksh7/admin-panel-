@@ -39,6 +39,7 @@ interface ReturnRow {
   createdAt: string;
   orderId?: string;
   orderNumber?: string;
+  currency?: string;
   order?: { id: string; orderNumber: string; email?: string; currency?: string } | null;
   refundAmount?: string | null;
   email?: string;
@@ -55,7 +56,7 @@ interface ReturnDetailDto extends ReturnRow {
     title?: string;
     sku?: string;
   }[];
-  history?: { id?: string; status: string; note: string | null; createdAt: string }[];
+  history?: { status: string; note: string | null; at?: string; createdAt?: string }[];
 }
 
 const orderOf = (r: ReturnRow) => ({
@@ -350,7 +351,7 @@ export function ReturnDetail() {
               {r.refundAmount && (
                 <>
                   <dt>Refund amount</dt>
-                  <dd>{fmt(r.refundAmount, r.order?.currency)}</dd>
+                  <dd>{fmt(r.refundAmount, r.currency ?? r.order?.currency)}</dd>
                 </>
               )}
             </dl>
@@ -407,10 +408,10 @@ export function ReturnDetail() {
           <Card title="History">
             <ol className="ops-timeline">
               {[...(r.history ?? [])].reverse().map((h, i) => (
-                <li key={h.id ?? i}>
+                <li key={`${h.status}-${i}`}>
                   <strong>{pretty(h.status)}</strong>
                   {h.note && <div>{h.note}</div>}
-                  <small className="muted">{formatDate(h.createdAt)}</small>
+                  <small className="muted">{formatDate(h.at ?? h.createdAt)}</small>
                 </li>
               ))}
             </ol>

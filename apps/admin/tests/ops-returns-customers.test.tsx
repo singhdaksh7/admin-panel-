@@ -8,17 +8,33 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** Mirrors the REAL admin returns DTO from apps/api/src/modules/returns (adminDto). */
 const ret = (status: string) => ({
   id: "r1",
+  orderId: "o1",
+  orderNumber: "ORD-100001",
+  email: "buyer@example.com",
   status,
   reason: "Wrong size",
   details: "Too small",
+  decisionNote: null,
+  refundAmount: null,
+  currency: "USD",
   createdAt: "2026-02-02T10:00:00Z",
-  order: { id: "o1", orderNumber: "ORD-100001", currency: "USD" },
   items: [
-    { id: "ri1", orderItemId: "oi1", quantity: 1, restock: false, productTitle: "Linen Shirt" },
+    {
+      id: "ri1",
+      orderItemId: "oi1",
+      title: "Linen Shirt",
+      variantTitle: null,
+      sku: "LS-1",
+      quantity: 1,
+      restock: false,
+      lineTotal: "25.00",
+      orderedQuantity: 2,
+    },
   ],
-  history: [{ status: "REQUESTED", note: null, createdAt: "2026-02-02T10:00:00Z" }],
+  history: [{ status: "REQUESTED", note: null, actorId: null, at: "2026-02-02T10:00:00Z" }],
 });
 
 describe("returns", () => {
@@ -37,6 +53,12 @@ describe("returns", () => {
     await waitFor(() =>
       expect(callsTo("GET", "/returns").at(-1)!.query.get("status")).toBe("APPROVED"),
     );
+  });
+
+  it("renders detail fields from the real API shape (item title, history date)", async () => {
+    renderAt("/returns/r1", ADMIN_PERMS, { "GET /returns/r1": { body: ret("REQUESTED") } });
+    expect(await screen.findByText("Linen Shirt")).toBeInTheDocument();
+    expect(screen.queryByText(/Invalid Date/i)).not.toBeInTheDocument();
   });
 
   it("approves a requested return", async () => {
