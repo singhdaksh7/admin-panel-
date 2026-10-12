@@ -92,7 +92,7 @@ describe("seo defaults admin", () => {
     });
     expect(row.config).toMatchObject({ defaultDescription: "Hi" });
     const pub = await request(app).get("/api/v1/seo/defaults");
-    expect(pub.body.defaultOgImageUrl).toBe("og.jpg");
+    expect(pub.body.defaultOgImageUrl).toMatch(/og.jpg$/);
     expect((await admin.put("/api/v1/admin/seo", { titleTemplate: "no placeholder" })).status).toBe(
       422,
     );

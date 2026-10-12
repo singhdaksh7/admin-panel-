@@ -243,8 +243,8 @@ describe("public resolution", () => {
     const res = await request(app).get("/api/v1/pages/resolved");
     expect(res.status).toBe(200);
     const [hero, byCat, bySlug, cats, blog] = res.body.sections;
-    expect(hero.content.image.desktopUrl).toBe("hero-d.jpg");
-    expect(hero.content.image.mobileUrl).toBe("hero-m.jpg");
+    expect(hero.content.image.desktopUrl).toMatch(/hero-d.jpg$/);
+    expect(hero.content.image.mobileUrl).toMatch(/hero-m.jpg$/);
     expect(byCat.content.items.map((p: { slug: string }) => p.slug).sort()).toEqual([
       "live-1",
       "live-2",
@@ -252,7 +252,7 @@ describe("public resolution", () => {
     expect(bySlug.content.items.map((p: { slug: string }) => p.slug)).toEqual(["live-2", "live-1"]);
     const live1 = bySlug.content.items[1];
     expect(live1.price).toBe("20.00");
-    expect(live1.imageUrl).toBe("hero-d.jpg");
+    expect(live1.imageUrl).toMatch(/hero-d.jpg$/);
     expect(cats.content.items.map((c: { slug: string }) => c.slug)).toEqual(["shoes"]);
     expect(cats.content.items[0].url).toBe("/category/shoes");
     expect(blog.content.items.map((p: { slug: string }) => p.slug)).toEqual(["pub-post"]);

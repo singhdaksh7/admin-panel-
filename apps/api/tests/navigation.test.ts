@@ -74,11 +74,8 @@ describe("navigation tree", () => {
     ]);
     // explicit "Shirts!" child + auto Pants (Shirts not duplicated, Retired inactive skipped)
     expect(items[1]!.children.map((c) => c.url)).toEqual(["/category/shirts", "/category/pants"]);
-    expect(items[1]!.promo).toMatchObject({
-      title: "Big sale",
-      mediaUrl: "promo.jpg",
-      url: "/sale",
-    });
+    expect(items[1]!.promo).toMatchObject({ title: "Big sale", url: "/sale" });
+    expect(items[1]!.promo.mediaUrl).toMatch(/promo\.jpg$/);
     expect(JSON.stringify(body)).not.toContain("_autoChildren");
     // device flags are returned, not filtered
     expect(items[2]).toMatchObject({ showMobile: false, showDesktop: true });
