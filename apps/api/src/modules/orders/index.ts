@@ -172,7 +172,13 @@ export function register(ctx: AppContext): ModuleRoutes {
           amount: x.amount.toFixed(2),
           refundedAmount: x.refundedAmount.toFixed(2),
         })),
-        invoice: o.invoice ?? { status: "NOT_GENERATED" },
+        invoice: o.invoice
+          ? {
+              status: "GENERATED",
+              invoiceNumber: o.invoice.invoiceNumber,
+              issuedAt: o.invoice.issuedAt,
+            }
+          : { status: "NOT_GENERATED" },
       });
     }),
   );

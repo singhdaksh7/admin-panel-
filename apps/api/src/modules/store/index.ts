@@ -54,6 +54,9 @@ const settingsBody = z
         guestCheckout: z.boolean(),
         requirePhone: z.boolean(),
         minOrderAmount: z.string().regex(/^\d+(\.\d{1,2})?$/),
+        orderPrefix: z.string().regex(/^[A-Z0-9]{1,8}$/, "1-8 characters, A-Z and 0-9 only"),
+        invoicePrefix: z.string().regex(/^[A-Z0-9]{1,8}$/, "1-8 characters, A-Z and 0-9 only"),
+        returnWindowDays: z.number().int().min(0).max(365),
       })
       .partial(),
     features: featureFlags,

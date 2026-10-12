@@ -14,7 +14,7 @@
  *   transitionOrder(ctx, orderId, toStatus, actor, note?): Promise<Order>
  *       Enforces TRANSITIONS under a row lock (SELECT ... FOR UPDATE). 409 on illegal transition.
  *       ->CONFIRMED commits stock, ->CANCELLED releases (never confirmed) or restocks (confirmed),
- *       ->RETURNED restocks once. Emits 'order.status' (non-blocking).
+ *       ->RETURNED restocks once (unless opts.restock === false: the returns module restocks per item). Emits 'order.status' (non-blocking).
  *   cancelOrder(ctx, orderId, actor, reason?): Promise<Order>   (= transitionOrder to CANCELLED)
  *   expireUnpaidOrders(ctx, maxAgeMs = 60min): Promise<number>   scheduled job body.
  *
@@ -185,7 +185,7 @@ export async function transitionOrder(
   to: OrderStatus,
   actor: Actor,
   note?: string,
-  opts: { onlyIfUnpaid?: boolean } = {},
+  opts: { onlyIfUnpaid?: boolean; restock?: boolean } = {},
 ): Promise<Order> {
   const result = await ctx.prisma.$transaction(
     async (tx) => {
@@ -204,7 +204,7 @@ export async function transitionOrder(
       if (to === "CONFIRMED")
         return { order: await doConfirm(tx, o, actor), changed: true, confirmed: true };
       if (to === "CANCELLED") return { order: await doCancel(tx, o, actor, note), changed: true };
-      if (to === "RETURNED") {
+      if (to === "RETURNED" && opts.restock !== false) {
         const already = await tx.inventoryMovement.count({
           where: { orderId: o.id, type: { in: ["RESTOCK", "RETURN"] } },
         });
