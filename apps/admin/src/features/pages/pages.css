@@ -1,0 +1,25 @@
+.pg-sections {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.pg-sections li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+.pg-sections li.pg-off {
+  opacity: 0.65;
+}
+.pg-sec-main {
+  min-width: 0;
+  flex: 1 1 220px;
+}

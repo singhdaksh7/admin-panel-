@@ -1,0 +1,19 @@
+.perm-matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.perm-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+.perm-group legend {
+  font-weight: 600;
+  text-transform: capitalize;
+  padding: 0 4px;
+}

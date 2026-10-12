@@ -268,11 +268,21 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Keep the latest onClose in a ref so the effect below runs ONCE per mount. Depending on onClose
+  // directly would re-run it (and steal focus) on every parent re-render.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>("input,select,textarea,button")?.focus();
+    // focus the first form field, falling back to the first button (never the "x" close button first)
+    const root = ref.current;
+    (
+      root?.querySelector<HTMLElement>(
+        ".modal-body input, .modal-body select, .modal-body textarea",
+      ) ?? root?.querySelector<HTMLElement>(".modal-foot button, .modal-body button")
+    )?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") closeRef.current();
       if (e.key === "Tab" && ref.current) {
         const f = ref.current.querySelectorAll<HTMLElement>(
           "a[href],button:not([disabled]),input,select,textarea",
@@ -294,7 +304,7 @@ export function Modal({
       document.removeEventListener("keydown", onKey);
       prev?.focus();
     };
-  }, [onClose]);
+  }, []);
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div

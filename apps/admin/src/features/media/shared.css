@@ -1,0 +1,103 @@
+.g-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+.g-image-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.g-checklist {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  max-height: 180px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.g-checklist legend {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 0 4px;
+}
+.g-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.g-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 4px 2px 10px;
+}
+.g-chip button {
+  all: unset;
+  cursor: pointer;
+  padding: 0 6px;
+  border-radius: 999px;
+}
+.g-chip button:focus-visible {
+  outline: 2px solid var(--primary);
+}
+.g-picker {
+  display: grid;
+  gap: 4px;
+}
+.g-results {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.g-results li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.g-results li:last-child {
+  border-bottom: 0;
+}
+.g-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.g-stack {
+  display: grid;
+  gap: 14px;
+}
+.g-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.g-stars {
+  color: #e0a100;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.g-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+}
