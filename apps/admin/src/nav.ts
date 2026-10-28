@@ -61,6 +61,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "Admin Users", path: "/users", perm: "users.read" },
       { label: "Roles", path: "/roles", perm: "users.read" },
+      { label: "Notifications", path: "/notifications", perm: "settings.read" },
       { label: "Audit Logs", path: "/audit-logs", perm: "audit.read" },
       { label: "Integrations", path: "/integrations", perm: "integrations.manage" },
     ],

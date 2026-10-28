@@ -49,6 +49,7 @@ import { routes as userRoutes } from "./features/users/routes";
 import { routes as roleRoutes } from "./features/roles/routes";
 import { routes as auditRoutes } from "./features/audit/routes";
 import { routes as integrationRoutes } from "./features/integrations/routes";
+import { routes as notificationRoutes } from "./features/notifications/routes";
 
 export const appRoutes: RouteObject[] = [
   {
@@ -77,6 +78,7 @@ export const appRoutes: RouteObject[] = [
   ...filterRoutes,
   ...seoRoutes,
   ...settingsRoutes,
+  ...notificationRoutes,
   ...userRoutes,
   ...roleRoutes,
   ...auditRoutes,

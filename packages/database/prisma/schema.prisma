@@ -118,22 +118,28 @@ model AuditLog {
 
 /// Singleton row (id = "store").
 model StoreSettings {
-  id            String   @id @default("store")
-  name          String   @default("My Store")
-  legalName     String?
-  logoMediaId   String?
-  faviconMediaId String?
-  supportEmail  String?
-  phone         String?
-  address       Json? // { line1, line2, city, state, postalCode, country }
-  currency      String   @default("USD") // ISO 4217
-  locale        String   @default("en-US")
-  timezone      String   @default("UTC")
-  tax           Json     @default("{}") // { mode: NONE|EXCLUSIVE|INCLUSIVE|INDIA_GST, gstin, homeState, defaultRate, pricesIncludeTax }
-  checkout      Json     @default("{}") // { guestCheckout, requirePhone, minOrderAmount, ... }
-  features      Json     @default("{}") // { customerAccounts, reviews, blog, coupons, inventory }
-  social        Json     @default("{}")
-  updatedAt     DateTime @updatedAt
+  id                 String   @id @default("store")
+  name               String   @default("My Store")
+  legalName          String?
+  tagline            String?
+  logoMediaId        String?
+  faviconMediaId     String?
+  logoDesktopWidth   Int?
+  logoDesktopHeight  Int?
+  logoMobileWidth    Int?
+  logoMobileHeight   Int?
+  supportEmail       String?
+  phone              String?
+  address            Json? // { line1, line2, city, state, postalCode, country }
+  currency           String   @default("USD") // ISO 4217
+  locale             String   @default("en-US")
+  timezone           String   @default("UTC")
+  tax                Json     @default("{}") // { mode: NONE|EXCLUSIVE|INCLUSIVE|INDIA_GST, gstin, homeState, defaultRate, pricesIncludeTax }
+  checkout           Json     @default("{}") // { guestCheckout, requirePhone, minOrderAmount, ... }
+  features           Json     @default("{}") // { customerAccounts, reviews, blog, coupons, inventory }
+  adminAlerts        Json     @default("{}") // { recipients: string[], events: Record<string, boolean> }
+  social             Json     @default("{}")
+  updatedAt          DateTime @updatedAt
 }
 
 /// Non-secret provider configuration. Secrets live in env vars ONLY.
@@ -467,6 +473,21 @@ model CustomerPasswordReset {
   createdAt  DateTime  @default(now())
 
   @@index([customerId])
+}
+
+model CustomerOtp {
+  id          String    @id @default(cuid())
+  email       String
+  codeHash    String
+  expiresAt   DateTime
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  resendAfter DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
 }
 
 model Address {
@@ -1020,6 +1041,7 @@ model NotificationTemplate {
   channel   String   @default("EMAIL")
   subject   String
   body      String // handlebars-lite {{var}} template
+  html      String? // handlebars-lite {{var}} HTML template (falls back to body if empty)
   isEnabled Boolean  @default(true)
   updatedAt DateTime @updatedAt
 
@@ -1027,13 +1049,17 @@ model NotificationTemplate {
 }
 
 model NotificationLog {
-  id        String   @id @default(cuid())
-  event     String
-  channel   String
-  recipient String
-  status    String // SENT | FAILED | SKIPPED
-  error     String?
-  createdAt DateTime @default(now())
+  id            String    @id @default(cuid())
+  event         String
+  channel       String
+  recipient     String
+  status        String // SENT | FAILED | SKIPPED
+  error         String?
+  retryCount    Int       @default(0)
+  maxRetries    Int       @default(3)
+  lastAttemptAt DateTime?
+  payload       Json?
+  createdAt     DateTime  @default(now())
 
   @@index([createdAt])
   @@index([recipient])

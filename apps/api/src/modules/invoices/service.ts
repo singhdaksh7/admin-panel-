@@ -195,7 +195,12 @@ function addressLines(a: InvoiceAddress | Record<string, unknown> | null | undef
 /** Renders the invoice PDF from the stored snapshot only. */
 export function renderInvoicePdf(snap: InvoiceSnapshot): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 40, info: { Title: snap.invoiceNumber } });
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 40,
+      bufferPages: true,
+      info: { Title: snap.invoiceNumber },
+    });
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -216,10 +221,13 @@ export function renderInvoicePdf(snap: InvoiceSnapshot): Promise<Buffer> {
     if (snap.seller.email) doc.text(snap.seller.email);
     if (snap.seller.phone) doc.text(snap.seller.phone);
     doc.fillColor("#000000");
+
+    // Tax Invoice only if legal tax registration (GSTIN) is present
+    const invoiceTitle = snap.seller.gstin ? "TAX INVOICE" : "INVOICE";
     doc
       .font("Helvetica-Bold")
       .fontSize(16)
-      .text("TAX INVOICE", left, 40, { width, align: "right" });
+      .text(invoiceTitle, left, 40, { width, align: "right" });
     doc.font("Helvetica").fontSize(10);
     doc.text(`Invoice no: ${snap.invoiceNumber}`, { width, align: "right" });
     doc.text(`Order no: ${snap.orderNumber}`, { width, align: "right" });
@@ -342,11 +350,21 @@ export function renderInvoicePdf(snap: InvoiceSnapshot): Promise<Buffer> {
     y += 6;
     row("Total", fmt(snap.totals.total), true);
 
-    doc.font("Helvetica").fontSize(8).fillColor("#666666");
-    doc.text("This is a computer-generated invoice.", left, doc.page.height - 60, {
-      width,
-      align: "center",
-    });
+    // Apply Page X of Y and footer across all buffered pages
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc.font("Helvetica").fontSize(8).fillColor("#666666");
+      doc.text(`Page ${i + 1} of ${range.count}`, left, doc.page.height - 45, {
+        width,
+        align: "right",
+      });
+      doc.text("This is a computer-generated invoice.", left, doc.page.height - 45, {
+        width,
+        align: "center",
+      });
+    }
+
     doc.end();
   });
 }

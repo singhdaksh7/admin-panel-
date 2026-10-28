@@ -227,3 +227,85 @@ describe("rates + permissions", () => {
     ).toBe(403);
   });
 });
+
+describe("Shiprocket webhook", () => {
+  it("processes DELIVERED webhook, updates shipment, transitions order to DELIVERED, and is idempotent", async () => {
+    const placed = await packed();
+    const created = await admin.post(`/api/v1/admin/orders/${placed.order.id}/shipments`, {});
+    expect(created.status).toBe(201);
+    const awb = created.body.awb;
+    expect(await statusOf(placed.order.id)).toBe("SHIPPED");
+
+    const payload = {
+      awb,
+      current_status: "DELIVERED",
+      current_status_id: 7,
+      courier_name: "Shiprocket Express",
+    };
+
+    // First delivery webhook
+    const res1 = await request(app)
+      .post("/api/v1/webhooks/shiprocket")
+      .set("x-shiprocket-event-id", `evt_deliv_${awb}`)
+      .send(payload);
+    expect(res1.status).toBe(200);
+    expect(res1.body).toMatchObject({ ok: true, matched: true });
+
+    // Order and shipment are now DELIVERED
+    expect(await statusOf(placed.order.id)).toBe("DELIVERED");
+    const shipmentRow = await prisma.shipment.findUniqueOrThrow({ where: { id: created.body.id } });
+    expect(shipmentRow.status).toBe("DELIVERED");
+
+    // Second delivery webhook is idempotent
+    const res2 = await request(app)
+      .post("/api/v1/webhooks/shiprocket")
+      .set("x-shiprocket-event-id", `evt_deliv_${awb}`)
+      .send(payload);
+    expect(res2.status).toBe(200);
+    expect(res2.body).toMatchObject({ ok: true, duplicate: true });
+  });
+
+  it("processes OUT FOR DELIVERY webhook and notifies customer", async () => {
+    const placed = await packed();
+    const created = await admin.post(`/api/v1/admin/orders/${placed.order.id}/shipments`, {});
+    const awb = created.body.awb;
+
+    const payload = {
+      awb,
+      current_status: "OUT FOR DELIVERY",
+      current_status_id: 17,
+      courier_name: "BlueDart",
+    };
+
+    const res = await request(app).post("/api/v1/webhooks/shiprocket").send(payload);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, matched: true });
+
+    const log = await prisma.notificationLog.findFirst({
+      where: { event: "order.out_for_delivery", recipient: "ship@example.com" },
+    });
+    expect(log).toBeDefined();
+  });
+
+  it("authenticates token when SHIPROCKET_WEBHOOK_SECRET is set", async () => {
+    process.env.SHIPROCKET_WEBHOOK_SECRET = "secure-sr-webhook-token";
+    ctx.env.SHIPROCKET_WEBHOOK_SECRET = "secure-sr-webhook-token";
+
+    // Invalid token rejected with 401
+    const bad = await request(app)
+      .post("/api/v1/webhooks/shiprocket")
+      .set("x-api-key", "wrong-token")
+      .send({ awb: "UNKNOWN_123" });
+    expect(bad.status).toBe(401);
+
+    // Valid token accepted
+    const good = await request(app)
+      .post("/api/v1/webhooks/shiprocket")
+      .set("x-api-key", "secure-sr-webhook-token")
+      .send({ awb: "UNKNOWN_123" });
+    expect(good.status).toBe(200);
+
+    delete process.env.SHIPROCKET_WEBHOOK_SECRET;
+    delete ctx.env.SHIPROCKET_WEBHOOK_SECRET;
+  });
+});

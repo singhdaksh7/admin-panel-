@@ -24,13 +24,18 @@ const schema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_PUBLIC_BASE_URL: z.string().optional(),
-  PAYMENT_PROVIDER: z.enum(["MOCK", "MANUAL", "RAZORPAY"]).default("MOCK"),
+  PAYMENT_PROVIDER: z.enum(["MOCK", "MANUAL", "RAZORPAY", "CASHFREE"]).default("MOCK"),
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  CASHFREE_APP_ID: z.string().optional(),
+  CASHFREE_SECRET_KEY: z.string().optional(),
+  CASHFREE_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
+  CASHFREE_API_VERSION: z.string().default("2023-08-01"),
   SHIPPING_PROVIDER: z.enum(["MANUAL", "MOCK", "SHIPROCKET"]).default("MANUAL"),
   SHIPROCKET_EMAIL: z.string().optional(),
   SHIPROCKET_PASSWORD: z.string().optional(),
+  SHIPROCKET_WEBHOOK_SECRET: z.string().optional(),
   EMAIL_PROVIDER: z.enum(["LOG", "SMTP"]).default("LOG"),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().default(587),
@@ -66,6 +71,13 @@ export function loadEnv(source: Record<string, string | undefined> = process.env
   )
     problems.push(
       "RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required for RAZORPAY",
+    );
+  if (
+    env.PAYMENT_PROVIDER === "CASHFREE" &&
+    !(env.CASHFREE_APP_ID && env.CASHFREE_SECRET_KEY)
+  )
+    problems.push(
+      "CASHFREE_APP_ID and CASHFREE_SECRET_KEY are required for CASHFREE",
     );
   if (env.SHIPPING_PROVIDER === "SHIPROCKET" && !(env.SHIPROCKET_EMAIL && env.SHIPROCKET_PASSWORD))
     problems.push("SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD are required for SHIPROCKET");

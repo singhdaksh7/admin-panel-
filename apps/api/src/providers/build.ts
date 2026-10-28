@@ -2,6 +2,7 @@ import { emptyProviders, type ProviderDeps, type Providers } from "./index";
 import { ManualPaymentProvider } from "./payment/manual";
 import { MockPaymentProvider } from "./payment/mock";
 import { RazorpayProvider } from "./payment/razorpay";
+import { CashfreeProvider } from "./payment/cashfree";
 import { ManualShippingProvider } from "./shipping/manual";
 import { MockShippingProvider } from "./shipping/mock";
 import { ShiprocketProvider } from "./shipping/shiprocket";
@@ -26,6 +27,14 @@ export function buildProviders(deps: ProviderDeps): Providers {
       keyId: env.RAZORPAY_KEY_ID,
       keySecret: env.RAZORPAY_KEY_SECRET,
       webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
+    });
+  }
+  if (env.CASHFREE_APP_ID && env.CASHFREE_SECRET_KEY) {
+    providers.payment.CASHFREE = new CashfreeProvider({
+      appId: env.CASHFREE_APP_ID,
+      secretKey: env.CASHFREE_SECRET_KEY,
+      isProduction: env.CASHFREE_ENV === "production",
+      apiVersion: env.CASHFREE_API_VERSION,
     });
   }
   if (env.SHIPROCKET_EMAIL && env.SHIPROCKET_PASSWORD) {

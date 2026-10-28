@@ -120,7 +120,10 @@ describe("lifecycle and stock", () => {
     expect(events[0]!.type).toBe("ORDER_PLACED");
     expect(events.at(-1)).toMatchObject({ actorType: "ADMIN", fromStatus: "RETURNED" });
     const mails = await prisma.notificationLog.count({
-      where: { event: "order.status", recipient: "buyer@example.com" },
+      where: {
+        event: { in: ["order.status", "order.processing", "order.shipped", "order.delivered", "order.cancelled"] },
+        recipient: "buyer@example.com",
+      },
     });
     expect(mails).toBeGreaterThanOrEqual(8);
   });

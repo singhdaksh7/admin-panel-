@@ -13,3 +13,6 @@ test-results/
 playwright-report/
 .worktrees/
 *.tsbuildinfo
+
+# real deployment files (templates are *.example)
+docker-compose.prod.yml

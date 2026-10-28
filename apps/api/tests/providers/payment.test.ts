@@ -4,6 +4,7 @@ import { AppError } from "@kash-commerce/shared";
 import { ManualPaymentProvider } from "../../src/providers/payment/manual";
 import { MockPaymentProvider, signMockPayment } from "../../src/providers/payment/mock";
 import { RazorpayProvider } from "../../src/providers/payment/razorpay";
+import { CashfreeProvider } from "../../src/providers/payment/cashfree";
 
 const hmac = (d: string | Buffer, k: string) => createHmac("sha256", k).update(d).digest("hex");
 
@@ -340,5 +341,180 @@ describe("RazorpayProvider", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("CashfreeProvider", () => {
+  const CF_APP_ID = "cf_app_id_test";
+  const CF_SECRET = "cf_secret_key_test_12345";
+
+  function cf(f: ReturnType<typeof fakeFetch>, isProduction = false) {
+    return new CashfreeProvider({
+      appId: CF_APP_ID,
+      secretKey: CF_SECRET,
+      isProduction,
+      fetch: f,
+      displayName: "Kash Commerce",
+    });
+  }
+
+  it("creates payment order with 2023-08-01 API and sandbox URL, never leaking secret", async () => {
+    const f = fakeFetch(200, {
+      order_id: "ORD-101",
+      cf_order_id: "cf_101",
+      payment_session_id: "session_abc123",
+      order_status: "ACTIVE",
+    });
+    const p = cf(f, false);
+    const res = await p.createPayment({
+      orderId: "ord_1",
+      orderNumber: "ORD-101",
+      amount: "499.00",
+      currency: "INR",
+      customer: { email: "shopper@example.com", name: "Shopper", phone: "9876543210" },
+      metadata: { returnUrl: "https://shop.example.com/return" },
+    });
+
+    const [url, init] = f.mock.calls[0]!;
+    expect(url).toBe("https://sandbox.cashfree.com/pg/orders");
+    expect(init?.method).toBe("POST");
+    const headers = init?.headers as Record<string, string>;
+    expect(headers["x-client-id"]).toBe(CF_APP_ID);
+    expect(headers["x-client-secret"]).toBe(CF_SECRET);
+    expect(headers["x-api-version"]).toBe("2023-08-01");
+
+    expect(res.providerOrderId).toBe("ORD-101");
+    expect(res.clientPayload).toMatchObject({
+      paymentSessionId: "session_abc123",
+      orderId: "ORD-101",
+      environment: "sandbox",
+      name: "Kash Commerce",
+    });
+    expect(JSON.stringify(res)).not.toContain(CF_SECRET);
+  });
+
+  it("verifies payment by fetching order payments status", async () => {
+    const fSuccess = fakeFetch(200, [{ cf_payment_id: 998877, payment_status: "SUCCESS" }]);
+    const p = cf(fSuccess);
+    const okRes = await p.verifyPayment({
+      providerOrderId: "ORD-101",
+      providerPaymentId: "998877",
+    });
+    expect(okRes).toMatchObject({ verified: true, providerPaymentId: "998877", status: "PAID" });
+
+    const fFail = fakeFetch(200, [{ cf_payment_id: 112233, payment_status: "USER_DROPPED" }]);
+    const pFail = cf(fFail);
+    const failRes = await pFail.verifyPayment({
+      providerOrderId: "ORD-101",
+      providerPaymentId: "112233",
+    });
+    expect(failRes).toMatchObject({ verified: false, status: "FAILED" });
+  });
+
+  describe("webhook", () => {
+    const p = cf(fakeFetch(200, {}));
+    const timestamp = "1698480000";
+    const sign = (raw: Buffer, ts = timestamp) => {
+      const sig = createHmac("sha256", CF_SECRET)
+        .update(ts + raw.toString("utf8"))
+        .digest("base64");
+      return {
+        "x-webhook-signature": sig,
+        "x-webhook-timestamp": ts,
+      };
+    };
+
+    it("verifies webhook signature and maps PAYMENT_SUCCESS_WEBHOOK", async () => {
+      const payload = {
+        type: "PAYMENT_SUCCESS_WEBHOOK",
+        event_time: "2026-10-28T12:00:00Z",
+        data: {
+          order: { order_id: "ORD-101", order_amount: 499.0 },
+          payment: { cf_payment_id: 998877, payment_amount: 499.0, payment_status: "SUCCESS" },
+        },
+      };
+      const raw = Buffer.from(JSON.stringify(payload));
+      const ev = await p.handleWebhook(raw, sign(raw));
+      expect(ev).toMatchObject({
+        type: "PAYMENT_SUCCESS_WEBHOOK",
+        providerOrderId: "ORD-101",
+        providerPaymentId: "998877",
+        status: "PAID",
+        amount: "499",
+      });
+    });
+
+    it("maps failed payment and refund webhooks", async () => {
+      const failPayload = {
+        type: "PAYMENT_FAILED_WEBHOOK",
+        data: {
+          order: { order_id: "ORD-101" },
+          payment: { cf_payment_id: 112233, payment_status: "FAILED" },
+        },
+      };
+      const failRaw = Buffer.from(JSON.stringify(failPayload));
+      const failEv = await p.handleWebhook(failRaw, sign(failRaw));
+      expect(failEv).toMatchObject({
+        type: "PAYMENT_FAILED_WEBHOOK",
+        providerOrderId: "ORD-101",
+        status: "FAILED",
+      });
+
+      const refundPayload = {
+        type: "REFUND_STATUS_WEBHOOK",
+        data: {
+          order: { order_id: "ORD-101" },
+          refund: { cf_refund_id: "cf_ref_55", refund_amount: 100.0 },
+        },
+      };
+      const refundRaw = Buffer.from(JSON.stringify(refundPayload));
+      const refEv = await p.handleWebhook(refundRaw, sign(refundRaw));
+      expect(refEv).toMatchObject({
+        type: "REFUND_STATUS_WEBHOOK",
+        providerOrderId: "ORD-101",
+        providerPaymentId: "cf_ref_55",
+        status: "REFUNDED",
+      });
+    });
+
+    it("rejects invalid signature or missing timestamp with 401", async () => {
+      const raw = Buffer.from(JSON.stringify({ type: "TEST" }));
+      await expect(
+        p.handleWebhook(raw, { "x-webhook-signature": "invalid_sig", "x-webhook-timestamp": "123" }),
+      ).rejects.toMatchObject({ status: 401 });
+      await expect(p.handleWebhook(raw, {})).rejects.toMatchObject({ status: 401 });
+    });
+  });
+
+  it("refunds with idempotencyKey and sanitizes upstream errors", async () => {
+    const f = fakeFetch(200, {
+      cf_refund_id: "cfr_88",
+      refund_id: "ref_idem_1",
+      refund_status: "SUCCESS",
+    });
+    const p = cf(f);
+    const r = await p.refundPayment({
+      providerPaymentId: "ORD-101",
+      amount: "150.00",
+      currency: "INR",
+      reason: "Product return",
+      idempotencyKey: "ref_idem_1",
+    });
+    expect(r).toEqual({ providerRefundId: "cfr_88", status: "PROCESSED" });
+
+    // Upstream 500 error sanitization
+    const f500 = fakeFetch(500, { message: `internal crash with ${CF_SECRET}` });
+    const p500 = cf(f500);
+    const err = await p500
+      .refundPayment({
+        providerPaymentId: "ORD-101",
+        amount: "50.00",
+        currency: "INR",
+        idempotencyKey: "k2",
+      })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect(err).toMatchObject({ status: 502, code: "PROVIDER_ERROR" });
+    expect(JSON.stringify({ m: (err as Error).message })).not.toContain(CF_SECRET);
   });
 });
