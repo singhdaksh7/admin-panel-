@@ -31,6 +31,7 @@ const schema = z.object({
   CASHFREE_APP_ID: z.string().optional(),
   CASHFREE_SECRET_KEY: z.string().optional(),
   CASHFREE_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
+  CASHFREE_API_VERSION: z.string().default("2023-08-01"),
   SHIPPING_PROVIDER: z.enum(["MANUAL", "MOCK", "SHIPROCKET"]).default("MANUAL"),
   SHIPROCKET_EMAIL: z.string().optional(),
   SHIPROCKET_PASSWORD: z.string().optional(),

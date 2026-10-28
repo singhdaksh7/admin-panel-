@@ -34,6 +34,7 @@ export function buildProviders(deps: ProviderDeps): Providers {
       appId: env.CASHFREE_APP_ID,
       secretKey: env.CASHFREE_SECRET_KEY,
       isProduction: env.CASHFREE_ENV === "production",
+      apiVersion: env.CASHFREE_API_VERSION,
     });
   }
   if (env.SHIPROCKET_EMAIL && env.SHIPROCKET_PASSWORD) {

@@ -45,7 +45,7 @@ closes the tab. Both paths are idempotent.
    then call `commerce.payments.verify({ orderNumber, email, providerOrderId, providerPaymentId, signature })`.
    See `docs/STOREFRONT_INTEGRATION.md`.
 
-## Cashfree PG setup (API v2023-08-01)
+## Cashfree PG setup (API v2023-08-01 / v2026-01-01)
 
 1. Cashfree Merchant Dashboard -> Developers -> API Keys. Set:
    ```bash
@@ -53,12 +53,13 @@ closes the tab. Both paths are idempotent.
    CASHFREE_APP_ID=your_cashfree_app_id
    CASHFREE_SECRET_KEY=your_cashfree_secret_key
    CASHFREE_ENV=production  # or "sandbox" for test mode
+   CASHFREE_API_VERSION=2023-08-01  # optional, default: 2023-08-01 (supports 2026-01-01)
    ```
    The API validates that both App ID and Secret Key are present when `PAYMENT_PROVIDER=CASHFREE`.
 2. Cashfree Dashboard -> Webhooks -> Add endpoint:
    - Webhook URL: `https://<api-origin>/api/v1/webhooks/cashfree`
    - Subscribed Events: `PAYMENT_SUCCESS_WEBHOOK`, `PAYMENT_FAILED_WEBHOOK`, `PAYMENT_USER_DROPPED_WEBHOOK`, `REFUND_STATUS_WEBHOOK`.
-   - Signature format: Cashfree sends Base64-encoded `HMAC-SHA256(timestamp + rawBody, secretKey)` in header `x-webhook-signature`.
+   - Signature format: Cashfree sends Base64-encoded `HMAC-SHA256(timestamp + rawBody, secretKey)` in header `x-webhook-signature` with timestamp in `x-webhook-timestamp`.
 3. Storefront flow:
    - On checkout creation, Kash Commerce returns `clientPayload.paymentSessionId`.
    - Storefront initialises Cashfree JS SDK (`load({ mode: "production" })`) and invokes `checkout({ paymentSessionId })`.
