@@ -306,4 +306,135 @@ describe("feature flag + admin", () => {
       ).status,
     ).toBe(401);
   });
+
+  describe("customer OTP passwordless login", () => {
+    it("requests OTP: generates 6-digit code, hashes at rest, enforces cooldown and non-enumeration", async () => {
+      const email = "otp-shopper@example.com";
+      const res1 = await request(app).post("/api/v1/account/otp/request").send({ email });
+      expect(res1.status).toBe(200);
+      expect(res1.body).toMatchObject({ ok: true });
+
+      // Check DB record
+      const otp = await prisma.customerOtp.findFirst({
+        where: { email },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(otp).toBeDefined();
+      expect(otp!.codeHash).toHaveLength(64); // SHA-256
+      expect(otp!.expiresAt.getTime()).toBeGreaterThan(Date.now());
+      expect(otp!.usedAt).toBeNull();
+
+      // Check notification log received the login_code
+      const log = await prisma.notificationLog.findFirst({
+        where: { event: "customer.login_code", recipient: email },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(log).toBeDefined();
+      const sentCode = (log?.payload as { code?: string })?.code;
+      expect(sentCode).toMatch(/^\d{6}$/);
+
+      // Rapid second request within cooldown is rejected with 429
+      const res2 = await request(app).post("/api/v1/account/otp/request").send({ email });
+      expect(res2.status).toBe(429);
+    });
+
+    it("verifies OTP: signs in customer, claims guest orders, and allows setting password", async () => {
+      const email = "guest-turned-user@example.com";
+
+      // 1. Place a guest order first
+      const { variant } = await seedProduct({ stock: 10 });
+      const cartToken = await addToCart(app, variant.id, 1);
+      const guestRes = await checkout(app, cartToken, {
+        email,
+        paymentProvider: "MANUAL",
+      });
+      expect(guestRes.status).toBe(201);
+      const orderNumber = guestRes.body.order.orderNumber as string;
+      const unlinkedOrder = await prisma.order.findUniqueOrThrow({ where: { orderNumber } });
+      expect(unlinkedOrder.customerId).toBeNull();
+
+      // 2. Request OTP
+      await request(app).post("/api/v1/account/otp/request").send({ email });
+      const log = await prisma.notificationLog.findFirst({
+        where: { event: "customer.login_code", recipient: email },
+        orderBy: { createdAt: "desc" },
+      });
+      const code = String((log?.payload as { code?: string })?.code ?? "");
+
+      // 3. Verify with wrong code first -> increments attempts, returns 401
+      const badVerify = await request(app)
+        .post("/api/v1/account/otp/verify")
+        .send({ email, code: "000000" });
+      expect(badVerify.status).toBe(401);
+
+      const otpAfterBad = await prisma.customerOtp.findFirst({
+        where: { email, usedAt: null },
+      });
+      expect(otpAfterBad?.attempts).toBe(1);
+
+      // 4. Verify with correct code -> logs in, creates session cookie
+      const agent = request.agent(app);
+      const goodVerify = await agent.post("/api/v1/account/otp/verify").send({ email, code });
+      expect(goodVerify.status).toBe(200);
+      expect(goodVerify.body.customer.email).toBe(email);
+      expect(goodVerify.body.requiresPasswordSetup).toBe(true);
+      expect(goodVerify.body.csrfToken).toBeDefined();
+
+      // 5. Prior guest order was automatically claimed
+      const claimed = await prisma.order.findUniqueOrThrow({ where: { orderNumber } });
+      expect(claimed.customerId).toBe(goodVerify.body.customer.id);
+
+      // 6. Set password
+      const setPass = await agent
+        .post("/api/v1/account/set-password")
+        .set("x-csrf-token", goodVerify.body.csrfToken)
+        .send({ password: "Strong-Password-123" });
+      expect(setPass.status).toBe(200);
+
+      // 7. Verify OTP is now marked used
+      const otpUsed = await prisma.customerOtp.findUniqueOrThrow({ where: { id: otpAfterBad!.id } });
+      expect(otpUsed.usedAt).not.toBeNull();
+
+      // 8. Re-using the same OTP is rejected
+      const reuse = await request(app).post("/api/v1/account/otp/verify").send({ email, code });
+      expect(reuse.status).toBe(401);
+    });
+
+    it("locks after max attempts and rejects expired OTPs", async () => {
+      const email = "lockout-test@example.com";
+      await request(app).post("/api/v1/account/otp/request").send({ email });
+      const log = await prisma.notificationLog.findFirst({
+        where: { event: "customer.login_code", recipient: email },
+        orderBy: { createdAt: "desc" },
+      });
+      const payload = log?.payload as { code?: string } | undefined;
+      const code = payload?.code ?? "";
+
+      // Exhaust attempts
+      for (let i = 0; i < 5; i++) {
+        await request(app).post("/api/v1/account/otp/verify").send({ email, code: "999999" });
+      }
+
+      // Now even correct code is locked out with 429
+      const lockedRes = await request(app).post("/api/v1/account/otp/verify").send({ email, code });
+      expect(lockedRes.status).toBe(429);
+
+      // Expired OTP
+      const expiredEmail = "expired-otp@example.com";
+      const { sha256 } = await import("../src/lib/crypto");
+      await prisma.customerOtp.create({
+        data: {
+          email: expiredEmail,
+          codeHash: sha256("123456"),
+          expiresAt: new Date(Date.now() - 60_000), // expired 1 min ago
+          resendAfter: new Date(Date.now() - 120_000),
+        },
+      });
+
+      const expRes = await request(app)
+        .post("/api/v1/account/otp/verify")
+        .send({ email: expiredEmail, code: "123456" });
+      expect(expRes.status).toBe(401);
+    });
+  });
 });

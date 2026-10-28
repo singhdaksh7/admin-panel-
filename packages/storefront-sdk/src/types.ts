@@ -72,8 +72,13 @@ export interface FeatureFlags {
 export interface StoreSettings {
   name: string;
   legalName: string | null;
+  tagline?: string | null;
   logoMediaId: string | null;
   faviconMediaId: string | null;
+  logoDesktopWidth?: number | null;
+  logoDesktopHeight?: number | null;
+  logoMobileWidth?: number | null;
+  logoMobileHeight?: number | null;
   /** Resolved public URLs of the logo / favicon (null when not set). */
   logoUrl: string | null;
   faviconUrl: string | null;
@@ -679,6 +684,19 @@ export interface RegisterInput {
 export interface LoginInput {
   email: string;
   password: string;
+}
+
+export interface RequestOtpInput {
+  email: string;
+}
+
+export interface VerifyOtpInput {
+  email: string;
+  code: string;
+}
+
+export interface OtpAuthSession extends AuthSession {
+  requiresPasswordSetup?: boolean;
 }
 
 export interface ProfileInput {

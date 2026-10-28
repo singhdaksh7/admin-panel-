@@ -19,9 +19,15 @@ export async function syncRbac(prisma: PrismaClient): Promise<void> {
     const existing = await prisma.rolePermission.count({ where: { roleId: role.id } });
     if (existing === 0 || key === "SUPER_ADMIN") {
       await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
-      await prisma.rolePermission.createMany({
-        data: def.permissions.map((pk) => ({ roleId: role.id, permissionId: byKey.get(pk)! })),
-      });
+      const rolePerms = def.permissions
+        .map((pk) => ({ roleId: role.id, permissionId: byKey.get(pk) }))
+        .filter((x): x is { roleId: string; permissionId: string } => !!x.permissionId);
+      if (rolePerms.length > 0) {
+        await prisma.rolePermission.createMany({
+          data: rolePerms,
+          skipDuplicates: true,
+        });
+      }
     }
   }
   await prisma.storeSettings.upsert({

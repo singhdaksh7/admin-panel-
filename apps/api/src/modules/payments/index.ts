@@ -14,6 +14,7 @@ import { customerAuth } from "../../middleware/customerAuth";
 import { markPaymentStatus, type Actor } from "../orders/service";
 import { loadAccessibleOrder, safeProviderMessage } from "./access";
 import { createRefund, finalizeRefund, settleRefund } from "./refunds";
+import { notifyAdmin } from "../notifications/service";
 
 const money = z.preprocess(
   (v) => (typeof v === "number" ? String(v) : v),
@@ -163,17 +164,29 @@ export function register(ctx: AppContext): ModuleRoutes {
           },
           actor,
         );
+        await notifyAdmin(ctx, "payment_successful", {
+          orderNumber: order.orderNumber,
+          total: order.total.toString(),
+          currency: order.currency,
+        });
         return respond();
       }
       if (result.verified && result.status === "PENDING") return respond(202);
       // failed verification: only a still-PENDING payment is marked FAILED; a PAID one is never touched
       const cur = await p.payment.findUniqueOrThrow({ where: { id: payment.id } });
-      if (cur.status === "PENDING")
+      if (cur.status === "PENDING") {
         await markPaymentStatus(
           ctx,
           { orderId: order.id, paymentId: payment.id, status: "FAILED" },
           actor,
         );
+        await notifyAdmin(ctx, "payment_failed", {
+          orderNumber: order.orderNumber,
+          total: order.total.toString(),
+          currency: order.currency,
+          status: "Verification failed",
+        });
+      }
       throw new AppError(402, "PAYMENT_FAILED", "Payment verification failed");
     }),
   );
@@ -275,10 +288,10 @@ export function register(ctx: AppContext): ModuleRoutes {
   // ───────── POST /webhooks/:provider ─────────
   webhooks.post(
     "/:provider",
-    h(async (req, res) => {
+    h(async (req, res, next) => {
       const key = String(req.params.provider).toUpperCase();
       const impl = ctx.providers.payment[key];
-      if (!impl || key === "MANUAL") throw AppError.notFound("Webhook endpoint");
+      if (!impl || key === "MANUAL") return void next();
       if (!req.rawBody) throw AppError.badRequest("Missing request body");
       // throws 401 on a bad signature, 400 on malformed payload
       const ev = await impl.handleWebhook(req.rawBody, headerMap(req.headers));
@@ -360,12 +373,26 @@ export function register(ctx: AppContext): ModuleRoutes {
           },
           actor,
         );
+        await notifyAdmin(ctx, "payment_successful", {
+          orderNumber: order.orderNumber,
+          total: order.total.toString(),
+          currency: order.currency,
+        });
       } else if (payment.status === "PENDING") {
+        const order = await p.order.findUnique({ where: { id: payment.orderId } });
         await markPaymentStatus(
           ctx,
           { orderId: payment.orderId, paymentId: payment.id, status: "FAILED" },
           actor,
         );
+        if (order) {
+          await notifyAdmin(ctx, "payment_failed", {
+            orderNumber: order.orderNumber,
+            total: order.total.toString(),
+            currency: order.currency,
+            status: "Webhook reported payment failure",
+          });
+        }
       }
       return null;
     }

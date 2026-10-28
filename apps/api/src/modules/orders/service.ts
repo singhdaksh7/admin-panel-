@@ -24,12 +24,12 @@
 import type { Order, OrderItem, OrderStatus, PaymentStatus, Tx } from "@kash-commerce/database";
 import { AppError } from "@kash-commerce/shared";
 import type { AppContext } from "../../context";
-import { notify } from "../notifications/service";
+import { notify, notifyAdmin } from "../notifications/service";
 import { releaseCouponRedemption } from "../coupons/service";
 import { commitStock, releaseStock, restockItems } from "../inventory/service";
 
 export interface Actor {
-  type: "ADMIN" | "CUSTOMER" | "SYSTEM" | "WEBHOOK";
+  type: "ADMIN" | "CUSTOMER" | "SYSTEM" | "WEBHOOK" | "SHIPPING_PROVIDER" | "PAYMENT";
   id?: string | null;
 }
 
@@ -145,14 +145,53 @@ export async function sendConfirmationEmail(ctx: AppContext, o: Order) {
     total: o.total.toString(),
     currency: o.currency,
   });
+
+  const custSnap = (o.customerSnapshot as Record<string, unknown> | null) ?? {};
+  const shipSnap = (o.shippingAddress as Record<string, unknown> | null) ?? {};
+  const dest = [shipSnap.line1, shipSnap.city, shipSnap.state, shipSnap.country].map((v) => (v ? String(v) : "")).filter(Boolean).join(", ");
+  const base = ctx.env.CORS_ORIGINS[0] ?? ctx.env.PUBLIC_API_URL;
+  await notifyAdmin(ctx, "new_order", {
+    orderNumber: o.orderNumber,
+    customerName: String(custSnap.name || customerName(o)),
+    customerEmail: o.email,
+    customerPhone: String(custSnap.phone || ""),
+    total: o.total.toString(),
+    currency: o.currency,
+    paymentMethod: o.paymentStatus,
+    paymentStatus: o.paymentStatus,
+    shippingAddress: dest || "Standard",
+    adminOrderUrl: `${base}/admin/orders/${o.id}`,
+  });
 }
 
 async function sendStatusEmail(ctx: AppContext, o: Order) {
-  await notify(ctx, "order.status", o.email, {
+  let event = "order.status";
+  if (o.status === "PROCESSING") event = "order.processing";
+  else if (o.status === "SHIPPED") event = "order.shipped";
+  else if (o.status === "DELIVERED") event = "order.delivered";
+  else if (o.status === "CANCELLED") event = "order.cancelled";
+
+  await notify(ctx, event, o.email, {
     name: customerName(o),
     orderNumber: o.orderNumber,
     status: o.status,
+    total: o.total.toString(),
+    currency: o.currency,
   });
+
+  if (o.status === "CANCELLED") {
+    await notifyAdmin(ctx, "cancelled", {
+      orderNumber: o.orderNumber,
+      total: o.total.toString(),
+      currency: o.currency,
+    });
+  } else if (o.status === "DELIVERED") {
+    await notifyAdmin(ctx, "delivered", {
+      orderNumber: o.orderNumber,
+      total: o.total.toString(),
+      currency: o.currency,
+    });
+  }
 }
 
 export async function confirmOrderInTx(

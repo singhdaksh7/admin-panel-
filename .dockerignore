@@ -1,0 +1,25 @@
+# Keep secrets, local state and heavy folders OUT of the build context (and therefore out of image layers).
+.git
+.github
+.worktrees
+**/node_modules
+**/dist
+**/coverage
+**/.uploads*
+uploads
+backups
+test-results
+playwright-report
+
+# secrets / local config - never copy into an image
+.env
+.env.*
+!.env.example
+docker-compose.prod.yml
+
+# docs and editor noise are not needed to build
+docs
+*.md
+.vscode
+.idea
+graphify-out

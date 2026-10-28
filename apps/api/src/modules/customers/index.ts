@@ -90,6 +90,14 @@ const resetBody = z.object({
   token: z.string().min(20).max(200),
   newPassword: z.string().min(1).max(200),
 });
+const otpRequestBody = z.object({ email });
+const otpVerifyBody = z.object({
+  email,
+  code: z.string().trim().regex(/^\d{6}$/, "Must be a 6-digit code"),
+});
+const setPasswordBody = z.object({
+  password: z.string().min(1).max(200),
+});
 
 export const addressBody = z.object({
   label: z.string().trim().max(40).nullish(),
@@ -268,6 +276,137 @@ export function register(ctx: AppContext): ModuleRoutes {
       const { token, csrfToken } = await createSession(req, customer.id);
       setCookie(res, token);
       res.json({ customer: customerDto(customer), csrfToken });
+    }),
+  );
+
+  router.post(
+    "/account/otp/request",
+    limiters.auth,
+    h(async (req, res) => {
+      const { email: addr } = parse(otpRequestBody, req.body);
+
+      // Cooldown check: if an active OTP was requested within the last 60 seconds
+      const activeCooldown = await p.customerOtp.findFirst({
+        where: { email: addr, usedAt: null, resendAfter: { gt: new Date() } },
+      });
+      if (activeCooldown) {
+        throw new AppError(429, "RATE_LIMITED", "Please wait before requesting another code.");
+      }
+
+      // Invalidate previous unused codes for this email
+      await p.customerOtp.updateMany({
+        where: { email: addr, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+
+      // Secure 6-digit code
+      const code = crypto.randomInt(100000, 1000000).toString();
+      const codeHash = sha256(code);
+
+      await p.customerOtp.create({
+        data: {
+          email: addr,
+          codeHash,
+          expiresAt: new Date(Date.now() + 10 * 60_000), // 10 minutes
+          resendAfter: new Date(Date.now() + 60_000), // 60 seconds cooldown
+          maxAttempts: 5,
+        },
+      });
+
+      // Dispatch login_code email (never log code plaintext)
+      await notify(ctx, "customer.login_code", addr, { code });
+
+      // Generic response - identical whether customer exists or not
+      res.json({ ok: true, message: "If that email is valid, a login code has been sent." });
+    }),
+  );
+
+  router.post(
+    "/account/otp/verify",
+    limiters.auth,
+    h(async (req, res) => {
+      const { email: addr, code } = parse(otpVerifyBody, req.body);
+      const otp = await p.customerOtp.findFirst({
+        where: { email: addr, usedAt: null },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const generic = AppError.unauthenticated("Invalid or expired login code");
+
+      if (!otp) throw generic;
+      if (otp.expiresAt < new Date()) throw generic;
+      if (otp.attempts >= otp.maxAttempts) {
+        throw new AppError(429, "RATE_LIMITED", "Too many failed attempts for this code. Please request a new one.");
+      }
+
+      // Check code
+      const expectedHash = otp.codeHash;
+      const givenHash = sha256(code);
+      if (!safeEqual(expectedHash, givenHash)) {
+        await p.customerOtp.update({
+          where: { id: otp.id },
+          data: { attempts: { increment: 1 } },
+        });
+        throw generic;
+      }
+
+      // Consume OTP
+      await p.customerOtp.update({
+        where: { id: otp.id },
+        data: { usedAt: new Date() },
+      });
+
+      // Find or create customer
+      let customer = await p.customer.findUnique({ where: { email: addr } });
+      if (!customer) {
+        customer = await p.customer.create({
+          data: {
+            email: addr,
+            emailVerified: true,
+            isGuest: false,
+          },
+        });
+        await notify(ctx, "customer.welcome", addr, { name: addr });
+      } else {
+        if (!customer.isActive) throw AppError.unauthenticated("Account deactivated");
+        if (!customer.emailVerified || customer.isGuest) {
+          customer = await p.customer.update({
+            where: { id: customer.id },
+            data: { emailVerified: true, isGuest: false },
+          });
+        }
+      }
+
+      // Prove mailbox control -> claim prior guest orders
+      await claimGuestOrders(customer.id, customer.email);
+
+      // Create session
+      const { token, csrfToken } = await createSession(req, customer.id);
+      setCookie(res, token);
+
+      res.json({
+        customer: customerDto(customer),
+        csrfToken,
+        requiresPasswordSetup: !customer.passwordHash,
+      });
+    }),
+  );
+
+  router.post(
+    "/account/set-password",
+    authed,
+    limiters.auth,
+    h(async (req, res) => {
+      const b = parse(setPasswordBody, req.body);
+      const problems = passwordProblems(b.password);
+      if (problems.length) throw AppError.validation(`Password ${problems.join(", ")}`);
+
+      await p.customer.update({
+        where: { id: req.customer!.id },
+        data: { passwordHash: await hashPassword(b.password) },
+      });
+
+      res.json({ ok: true });
     }),
   );
 

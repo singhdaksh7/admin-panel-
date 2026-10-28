@@ -22,6 +22,7 @@ import { register as shipments } from "./shipments";
 import { register as returns } from "./returns";
 import { register as invoices } from "./invoices";
 import { register as integrations } from "./integrations";
+import { register as notifications } from "./notifications";
 
 /**
  * Feature module registry. Order = mount order.
@@ -52,4 +53,5 @@ export const modules: ModuleRegister[] = [
   returns,
   invoices,
   integrations,
+  notifications,
 ];

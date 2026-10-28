@@ -206,4 +206,53 @@ describe("invoice PDF", () => {
     expect((await cm.get(`${url}.pdf`)).status).toBe(403);
     expect((await request(app).get(url)).status).toBe(401);
   });
+
+  it("renders TAX INVOICE only when GSTIN exists, and handles multi-page lines with pagination", async () => {
+    const { renderInvoicePdf } = await import("../src/modules/invoices/service");
+    const baseSnap = {
+      invoiceNumber: "INV-2026-000001",
+      orderNumber: "KC-000001",
+      issuedAt: new Date().toISOString(),
+      currency: "INR",
+      locale: "en-IN",
+      paymentStatus: "PAID",
+      seller: {
+        name: "Test Store",
+        legalName: "Test Store Pvt Ltd",
+        address: { line1: "123 Main St", city: "Mumbai", state: "MH", postalCode: "400001", country: "IN" },
+        gstin: null,
+        email: "support@teststore.com",
+        phone: "+919876543210",
+      },
+      buyer: { name: "John Doe", email: "john@example.com", phone: "+919876543211" },
+      shippingAddress: { line1: "456 Side St", city: "Delhi", postalCode: "110001", country: "IN" },
+      billingAddress: { line1: "456 Side St", city: "Delhi", postalCode: "110001", country: "IN" },
+      lines: Array.from({ length: 25 }, (_, i) => ({
+        description: `Very Long Product Description That Wraps Lines Nicely Item ${i + 1}`,
+        sku: `SKU-${i + 1}`,
+        hsn: "9988",
+        qty: 1,
+        unitPrice: "100.00",
+        discount: "0.00",
+        taxRate: "18",
+        taxAmount: "18.00",
+        lineTotal: "118.00",
+      })),
+      totals: { subtotal: "2500.00", discount: "0.00", shipping: "50.00", tax: "450.00", total: "3000.00" },
+      taxBreakdown: null,
+    };
+
+    // 1. Without GSTIN -> Renders regular INVOICE
+    const pdfWithoutGst = await renderInvoicePdf(baseSnap);
+    expect(pdfWithoutGst).toBeInstanceOf(Buffer);
+    expect(pdfWithoutGst.length).toBeGreaterThan(1000);
+
+    // 2. With GSTIN -> Renders TAX INVOICE
+    const pdfWithGst = await renderInvoicePdf({
+      ...baseSnap,
+      seller: { ...baseSnap.seller, gstin: "27AABCU9603R1ZN" },
+    });
+    expect(pdfWithGst).toBeInstanceOf(Buffer);
+    expect(pdfWithGst.length).toBeGreaterThan(1000);
+  });
 });

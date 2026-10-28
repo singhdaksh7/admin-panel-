@@ -33,8 +33,13 @@ const settingsBody = z
   .object({
     name: z.string().min(1).max(120),
     legalName: z.string().max(200).nullable(),
+    tagline: z.string().max(300).nullable().optional(),
     logoMediaId: z.string().nullable(),
     faviconMediaId: z.string().nullable(),
+    logoDesktopWidth: z.number().int().min(10).max(1200).nullable().optional(),
+    logoDesktopHeight: z.number().int().min(10).max(600).nullable().optional(),
+    logoMobileWidth: z.number().int().min(10).max(800).nullable().optional(),
+    logoMobileHeight: z.number().int().min(10).max(400).nullable().optional(),
     supportEmail: z.string().email().nullable(),
     phone: z.string().max(40).nullable(),
     address,
@@ -60,6 +65,12 @@ const settingsBody = z
       })
       .partial(),
     features: featureFlags,
+    adminAlerts: z
+      .object({
+        recipients: z.array(z.string().email()).max(10),
+        events: z.record(z.boolean()),
+      })
+      .partial(),
     social: z.record(z.string().url().max(300)),
   })
   .partial();
@@ -87,8 +98,13 @@ export function publicSettings(s: Awaited<ReturnType<typeof getSettings>>) {
   return {
     name: s.name,
     legalName: s.legalName,
+    tagline: s.tagline,
     logoMediaId: s.logoMediaId,
     faviconMediaId: s.faviconMediaId,
+    logoDesktopWidth: s.logoDesktopWidth,
+    logoDesktopHeight: s.logoDesktopHeight,
+    logoMobileWidth: s.logoMobileWidth,
+    logoMobileHeight: s.logoMobileHeight,
     supportEmail: s.supportEmail,
     phone: s.phone,
     address: s.address,
@@ -158,13 +174,14 @@ export function register(ctx: AppContext): ModuleRoutes {
           .json({ error: { code: "VALIDATION_ERROR", message: "Unknown timezone" } });
       }
       const before = await getSettings(ctx);
-      const { address: addr, tax, checkout, features, social, ...rest } = body;
+      const { address: addr, tax, checkout, features, adminAlerts, social, ...rest } = body;
       const data = {
         ...rest,
         ...(addr ? { address: { ...((before.address as object) ?? {}), ...addr } } : {}),
         ...(tax ? { tax: { ...((before.tax as object) ?? {}), ...tax } } : {}),
         ...(checkout ? { checkout: { ...((before.checkout as object) ?? {}), ...checkout } } : {}),
         ...(features ? { features: { ...((before.features as object) ?? {}), ...features } } : {}),
+        ...(adminAlerts ? { adminAlerts: { ...((before.adminAlerts as object) ?? {}), ...adminAlerts } } : {}),
         ...(social ? { social } : {}),
       };
       const after = await ctx.prisma.storeSettings.update({ where: { id: "store" }, data });

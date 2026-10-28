@@ -29,6 +29,7 @@ import type {
   OkResult,
   Order,
   OrderTracking,
+  OtpAuthSession,
   Page,
   PageSummary,
   Paginated,
@@ -41,6 +42,7 @@ import type {
   ProductQuery,
   ProfileInput,
   RegisterInput,
+  RequestOtpInput,
   ResetPasswordInput,
   ResolvedSeo,
   ReturnCreateInput,
@@ -55,6 +57,7 @@ import type {
   ShippingMethod,
   Sitemap,
   StoreSettings,
+  VerifyOtpInput,
 } from "./types";
 
 /** Per-call options accepted by every method that performs a request. */
@@ -292,7 +295,7 @@ export function createCommerceClient(options: CommerceClientOptions) {
   };
 
   // ───────── auth / account ─────────
-  const afterAuth = async (s: AuthSession, mergeCart?: boolean) => {
+  const afterAuth = async <S extends AuthSession>(s: S, mergeCart?: boolean): Promise<S> => {
     t.storeSession(s);
     if (mergeCart && (await t.getCartToken())) {
       try {
@@ -313,6 +316,20 @@ export function createCommerceClient(options: CommerceClientOptions) {
     login: async (input: LoginInput, o: { mergeCart?: boolean } & CallOptions = {}) =>
       afterAuth(
         await send<AuthSession>("POST", "/account/login", input, { signal: o.signal }),
+        o.mergeCart,
+      ),
+    /** Request a 6-digit one-time passwordless login code sent to the given email. */
+    requestOtp: (input: RequestOtpInput | string, c?: CallOptions) => {
+      const body = typeof input === "string" ? { email: input } : input;
+      return send<OkResult & { message?: string }>("POST", "/account/otp/request", body, c);
+    },
+    /** Verify a 6-digit OTP code to log in or create an account. */
+    verifyOtp: async (
+      input: VerifyOtpInput,
+      o: { mergeCart?: boolean } & CallOptions = {},
+    ) =>
+      afterAuth(
+        await send<OtpAuthSession>("POST", "/account/otp/verify", input, { signal: o.signal }),
         o.mergeCart,
       ),
     /** Ends the session. Local CSRF state is always cleared, even if the request fails. */
@@ -353,6 +370,9 @@ export function createCommerceClient(options: CommerceClientOptions) {
         .customer,
     changePassword: (input: ChangePasswordInput, c?: CallOptions) =>
       send<OkResult>("POST", "/account/change-password", input, { auth: true, ...c }),
+    /** Set initial password for passwordless/OTP verified accounts. */
+    setPassword: (password: string, c?: CallOptions) =>
+      send<OkResult>("POST", "/account/set-password", { password }, { auth: true, ...c }),
     addresses: {
       list: async (c?: CallOptions) =>
         (await get<ListResult<Address>>("/account/addresses", undefined, { auth: true, ...c }))

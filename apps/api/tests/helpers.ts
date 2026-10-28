@@ -12,7 +12,7 @@ import type { AppContext } from "../src/context";
 export const ADMIN_EMAIL = "root@test.example";
 export const ADMIN_PASSWORD = "Sup3r-secret-pass";
 
-const prisma = createPrisma(process.env.DATABASE_URL);
+const prisma = createPrisma(process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL);
 
 export function makeContext(overrides: Partial<Record<string, string>> = {}): AppContext {
   const env = loadEnv({ ...process.env, ...overrides });

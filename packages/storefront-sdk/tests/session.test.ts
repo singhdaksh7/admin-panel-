@@ -335,4 +335,28 @@ describe("customer session, CSRF and refresh", () => {
     ]);
     expect(calls[0]!.body).toEqual({ email: "a@b.co" });
   });
+
+  it("supports passwordless OTP request and verification and setPassword", async () => {
+    const { commerce, calls } = setup((c) => {
+      if (route(c) === "POST /account/otp/request") return json({ ok: true, message: "Code sent" });
+      if (route(c) === "POST /account/otp/verify")
+        return json({ customer, csrfToken: "csrf-otp-1", requiresPasswordSetup: true });
+      if (route(c) === "POST /account/set-password") return json({ ok: true });
+      return json({});
+    });
+
+    const reqRes = await commerce.auth.requestOtp("user@example.com");
+    expect(reqRes.ok).toBe(true);
+    expect(calls[0]!.body).toEqual({ email: "user@example.com" });
+
+    const verRes = await commerce.auth.verifyOtp({ email: "user@example.com", code: "123456" });
+    expect(verRes.customer.id).toBe(customer.id);
+    expect(verRes.csrfToken).toBe("csrf-otp-1");
+    expect(verRes.requiresPasswordSetup).toBe(true);
+    expect(commerce.auth.getCsrfToken()).toBe("csrf-otp-1");
+
+    const setRes = await commerce.account.setPassword("New-Password-1234");
+    expect(setRes.ok).toBe(true);
+    expect(calls[2]!.headers["x-csrf-token"]).toBe("csrf-otp-1");
+  });
 });

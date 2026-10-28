@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import type { Order, OrderItem, Prisma, Shipment } from "@kash-commerce/database";
@@ -6,12 +7,13 @@ import type { ShipmentAddress, ShipmentItem } from "@kash-commerce/provider-sdk"
 import type { AppContext } from "../../context";
 import type { ModuleRoutes } from "../types";
 import { h, idParam, parse } from "../../lib/http";
+import { safeEqual } from "../../lib/crypto";
 import { audit } from "../../lib/audit";
 import { createLimiters } from "../../lib/rateLimits";
 import { requirePermission } from "../../middleware/adminAuth";
 import { customerAuth } from "../../middleware/customerAuth";
 import { transitionOrder, type Actor } from "../orders/service";
-import { notify } from "../notifications/service";
+import { notify, notifyAdmin } from "../notifications/service";
 import { applyIntegrationConfig } from "../integrations/service";
 import { customerNameOf, loadAccessibleOrder, safeProviderMessage } from "../payments/access";
 
@@ -478,5 +480,141 @@ export function register(ctx: AppContext): ModuleRoutes {
     }),
   );
 
-  return { public: pub, admin };
+  const webhooks = Router();
+  webhooks.post(
+    "/shiprocket",
+    h(async (req, res) => {
+      // 1. Authenticate webhook token if configured
+      const token = req.headers["x-api-key"] || req.headers["x-shiprocket-token"];
+      const secret = ctx.env.SHIPROCKET_WEBHOOK_SECRET || ctx.env.SHIPROCKET_PASSWORD;
+      if (secret) {
+        if (!token || typeof token !== "string" || !safeEqual(token, secret)) {
+          throw new AppError(401, "UNAUTHENTICATED", "Invalid Shiprocket webhook token");
+        }
+      }
+
+      if (!req.rawBody) throw AppError.badRequest("Missing request body");
+
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(req.rawBody.toString("utf8")) as Record<string, unknown>;
+      } catch {
+        throw AppError.badRequest("Malformed JSON payload");
+      }
+
+      const awb = String(body.awb || body.awb_code || "").trim();
+      const shipmentId = String(body.shipment_id || "").trim();
+      const currentStatus = String(body.current_status || "").trim().toUpperCase();
+      const statusId = Number(body.current_status_id);
+
+      // Unique event ID for idempotency replay protection
+      const eventId =
+        (req.headers["x-shiprocket-event-id"] as string) ||
+        createHash("sha256").update(req.rawBody).digest("hex");
+      const payloadHash = createHash("sha256").update(req.rawBody).digest("hex");
+
+      try {
+        await p.webhookEvent.create({
+          data: {
+            provider: "SHIPROCKET",
+            eventId,
+            type: (currentStatus || "STATUS_UPDATE").slice(0, 100),
+            payloadHash,
+          },
+        });
+      } catch (err) {
+        if ((err as { code?: string }).code === "P2002") {
+          return void res.status(200).json({ ok: true, duplicate: true });
+        }
+        throw err;
+      }
+
+      // Locate matching shipment
+      const shipment = await p.shipment.findFirst({
+        where: {
+          OR: [
+            ...(awb ? [{ awb }] : []),
+            ...(shipmentId ? [{ providerShipmentId: shipmentId }] : []),
+          ],
+        },
+      });
+
+      if (!shipment) {
+        ctx.logger.info({ awb, shipmentId }, "Shiprocket webhook: no matching shipment found");
+        return void res.status(200).json({ ok: true, matched: false });
+      }
+
+      const order = await p.order.findUnique({ where: { id: shipment.orderId } });
+      if (!order) return void res.status(200).json({ ok: true });
+
+      const actor: Actor = { type: "SHIPPING_PROVIDER", id: "SHIPROCKET" };
+
+      // Map courier milestone statuses:
+      // Status 7: Delivered
+      // Status 17: Out for delivery
+      // Status 6, 18: In transit / Shipped
+      // Status 42: Undelivered / delivery failed
+      const isDelivered = statusId === 7 || currentStatus === "DELIVERED";
+      const isOFD =
+        statusId === 17 ||
+        currentStatus === "OUT FOR DELIVERY" ||
+        currentStatus === "OUT_FOR_DELIVERY";
+      const isInTransit =
+        [6, 18].includes(statusId) ||
+        currentStatus === "IN TRANSIT" ||
+        currentStatus === "IN_TRANSIT" ||
+        currentStatus === "SHIPPED";
+      const isFailed =
+        statusId === 42 ||
+        currentStatus.includes("UNDELIVERED") ||
+        currentStatus.includes("FAILED");
+
+      if (isDelivered) {
+        if (shipment.status !== "DELIVERED") {
+          await p.shipment.update({ where: { id: shipment.id }, data: { status: "DELIVERED" } });
+        }
+        await markDelivered(shipment.orderId, actor);
+      } else if (isOFD) {
+        if (shipment.status === "CREATED") {
+          await p.shipment.update({ where: { id: shipment.id }, data: { status: "IN_TRANSIT" } });
+        }
+        await notify(
+          ctx,
+          "order.out_for_delivery",
+          order.email,
+          {
+            orderNumber: order.orderNumber,
+            courierName: shipment.carrier || body.courier_name || "Courier",
+            trackingNumber: shipment.awb || awb,
+            trackingUrl: shipment.trackingUrl || undefined,
+          },
+          { deduplicationKey: `ofd:${order.orderNumber}` },
+        );
+        await notifyAdmin(ctx, "out_for_delivery", {
+          orderNumber: order.orderNumber,
+        });
+      } else if (isInTransit) {
+        if (shipment.status === "CREATED") {
+          await p.shipment.update({ where: { id: shipment.id }, data: { status: "IN_TRANSIT" } });
+        }
+      } else if (isFailed) {
+        await notify(
+          ctx,
+          "order.delivery_failed",
+          order.email,
+          {
+            orderNumber: order.orderNumber,
+            courierName: shipment.carrier || body.courier_name || "Courier",
+            trackingNumber: shipment.awb || awb,
+            trackingUrl: shipment.trackingUrl || undefined,
+          },
+          { deduplicationKey: `failed_delivery:${order.orderNumber}` },
+        );
+      }
+
+      res.status(200).json({ ok: true, matched: true, status: currentStatus });
+    }),
+  );
+
+  return { public: pub, admin, webhooks };
 }

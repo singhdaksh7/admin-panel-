@@ -14,7 +14,7 @@ import type { ReturnStatus, Tx } from "@kash-commerce/database";
 import { AppError, toMinor } from "@kash-commerce/shared";
 import type { AppContext } from "../../context";
 import { transitionOrder, type Actor } from "../orders/service";
-import { notify } from "../notifications/service";
+import { notify, notifyAdmin } from "../notifications/service";
 import { customerNameOf } from "../payments/access";
 
 export const OPEN_RETURN_STATUSES: ReturnStatus[] = ["REQUESTED", "APPROVED", "RECEIVED"];
@@ -37,6 +37,13 @@ export async function notifyReturn(ctx: AppContext, orderId: string, status: Ret
     orderNumber: o.orderNumber,
     status,
   });
+  if (status === "REQUESTED") {
+    await notifyAdmin(ctx, "return_requested", {
+      orderNumber: o.orderNumber,
+      customerName: customerNameOf(o),
+      customerEmail: o.email,
+    });
+  }
 }
 
 export async function settleOrderAfterReturnChange(
